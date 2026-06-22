@@ -4,9 +4,24 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const isLocal = () => (process.env.STORAGE_TYPE || 'minio') === 'local';
 const BUCKET = process.env.MINIO_BUCKET || 'mealplaner';
 
+// Internal client — used for API operations (upload, delete, bucket creation)
 function getClient() {
   return new S3Client({
     endpoint: process.env.MINIO_ENDPOINT || 'http://localhost:9000',
+    region: 'us-east-1',
+    credentials: {
+      accessKeyId: process.env.MINIO_ACCESS_KEY || 'mealplaner',
+      secretAccessKey: process.env.MINIO_SECRET_KEY || '***REMOVED***',
+    },
+    forcePathStyle: true,
+  });
+}
+
+// Public client — presigned URLs must use a hostname the browser can reach
+function getPublicClient() {
+  const publicUrl = process.env.MINIO_PUBLIC_URL || process.env.MINIO_ENDPOINT || 'http://localhost:9000';
+  return new S3Client({
+    endpoint: publicUrl,
     region: 'us-east-1',
     credentials: {
       accessKeyId: process.env.MINIO_ACCESS_KEY || 'mealplaner',
@@ -47,12 +62,19 @@ async function uploadImage(key, buffer, mimetype) {
 
 async function deleteImage(key) {
   if (isLocal()) return require('./local-storage').deleteImage(key);
-  await getClient().send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+  try {
+    await getClient().send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+  } catch (err) {
+    // Bucket or object missing — not an error worth surfacing
+    const code = err.Code || err.name || '';
+    if (code !== 'NoSuchBucket' && code !== 'NoSuchKey') throw err;
+  }
 }
 
 async function getImageUrl(key) {
   if (isLocal()) return require('./local-storage').getImageUrl(key);
-  return getSignedUrl(getClient(), new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: 3600 });
+  // Use public client so the presigned URL contains a hostname the browser can reach
+  return getSignedUrl(getPublicClient(), new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn: 86400 });
 }
 
 module.exports = { uploadImage, deleteImage, getImageUrl };

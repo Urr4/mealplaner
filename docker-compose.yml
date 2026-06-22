@@ -30,6 +30,7 @@ services:
       PORT: "3001"
       DB_PATH: /data/mealplaner.db
       MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_URL: http://pi1:9002
       MINIO_BUCKET: mealplaner
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-mealplaner}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-***REMOVED***}

@@ -20,10 +20,11 @@ OLLAMA_VISION_MODEL="${OLLAMA_VISION_MODEL:-llava:7b}" \
 OLLAMA_TEXT_MODEL="${OLLAMA_TEXT_MODEL:-llama3.2:3b}" \
 docker stack deploy -c "${SCRIPT_DIR}/docker-compose.yml" "${STACK}"
 
-# ── 3. App-Service neu starten damit das neue Image geladen wird ──────────────
+# ── 3. App-Service auf neues Image aktualisieren ──────────────────────────────
 # docker stack deploy mit :latest-Tag startet laufende Services NICHT neu.
-echo "==> Starte App-Service neu …"
-docker service update --force "${STACK}_app"
+# --image erzwingt die Nutzung des gerade gebauten Images.
+echo "==> Aktualisiere App-Service auf neues Image …"
+docker service update --image "${IMAGE}" "${STACK}_app"
 
 echo ""
 echo "✓ Deployment abgeschlossen. Erreichbar unter: http://pi1:3001"
