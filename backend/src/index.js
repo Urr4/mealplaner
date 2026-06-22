@@ -25,8 +25,11 @@ app.use('/api/settings', require('./routes/settings'));
 // ── Frontend (im Prod-Modus statisch ausgeliefert) ────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   const staticPath = path.join(__dirname, '../../frontend/dist');
+  // Assets (JS/CSS) have content-hash filenames → long cache is fine
   app.use(express.static(staticPath));
+  // index.html must never be cached so the browser always gets the latest asset hashes
   app.get('*', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile(path.join(staticPath, 'index.html'));
   });
 }
