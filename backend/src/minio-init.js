@@ -1,4 +1,4 @@
-const { S3Client, CreateBucketCommand, HeadBucketCommand } = require('@aws-sdk/client-s3');
+const { S3Client, CreateBucketCommand } = require('@aws-sdk/client-s3');
 
 const BUCKET = process.env.MINIO_BUCKET || 'mealplaner';
 const MAX_ATTEMPTS = 30;
@@ -27,31 +27,21 @@ async function ensureBucket() {
   // Docker Swarm ignores depends_on — retry until MinIO is ready
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      await client.send(new HeadBucketCommand({ Bucket: BUCKET }));
-      console.log(`[minio] Bucket "${BUCKET}" existiert bereits`);
+      await client.send(new CreateBucketCommand({ Bucket: BUCKET }));
+      console.log(`[minio] Bucket "${BUCKET}" erstellt`);
       return;
     } catch (err) {
-      // Bucket doesn't exist yet — try to create it
-      if (err.$metadata?.httpStatusCode === 404 || err.name === 'NoSuchBucket' || err.Code === 'NoSuchBucket') {
-        try {
-          await client.send(new CreateBucketCommand({ Bucket: BUCKET }));
-          console.log(`[minio] Bucket "${BUCKET}" erstellt`);
-          return;
-        } catch (createErr) {
-          console.warn(`[minio] Bucket anlegen fehlgeschlagen (Versuch ${attempt}/${MAX_ATTEMPTS}): ${createErr.message}`);
-        }
-      } else {
-        // MinIO not reachable yet
-        console.warn(`[minio] Noch nicht erreichbar (Versuch ${attempt}/${MAX_ATTEMPTS}): ${err.message}`);
+      const code = err.Code || err.name || '';
+      if (code === 'BucketAlreadyOwnedByYou' || code === 'BucketAlreadyExists') {
+        console.log(`[minio] Bucket "${BUCKET}" existiert bereits`);
+        return;
       }
-
-      if (attempt < MAX_ATTEMPTS) {
-        await sleep(RETRY_DELAY_MS);
-      }
+      console.warn(`[minio] Noch nicht bereit (Versuch ${attempt}/${MAX_ATTEMPTS}): ${err.message}`);
+      if (attempt < MAX_ATTEMPTS) await sleep(RETRY_DELAY_MS);
     }
   }
 
-  console.error(`[minio] Bucket "${BUCKET}" konnte nach ${MAX_ATTEMPTS} Versuchen nicht sichergestellt werden — Bilder funktionieren möglicherweise nicht`);
+  console.error(`[minio] Bucket "${BUCKET}" konnte nach ${MAX_ATTEMPTS} Versuchen nicht erstellt werden`);
 }
 
 module.exports = { ensureBucket };
