@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 1: Build React frontend
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:20-alpine AS frontend-build
+FROM mirror.gcr.io/library/node:20-alpine AS frontend-build
 
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
@@ -12,7 +12,7 @@ RUN npm run build
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2: Install backend production dependencies
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:20-alpine AS backend-deps
+FROM mirror.gcr.io/library/node:20-alpine AS backend-deps
 
 WORKDIR /app/backend
 COPY backend/package*.json ./
@@ -21,7 +21,7 @@ RUN npm ci --omit=dev
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 3: Final runtime image — ARM64 for Raspberry Pi
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:20-alpine
+FROM mirror.gcr.io/library/node:20-alpine
 
 WORKDIR /app
 

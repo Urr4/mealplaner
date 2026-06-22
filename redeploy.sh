@@ -24,32 +24,36 @@ OLLAMA_TEXT_MODEL="${OLLAMA_TEXT_MODEL:-llama3.2:3b}" \
 docker stack deploy -c "${SCRIPT_DIR}/docker-compose.yml" "${STACK}"
 
 # ── 3. Warten bis MinIO bereit ist (Port 9002 am Host) ────────────────────────
-echo "==> Warte auf MinIO (kann bis zu 60s dauern) …"
+echo "==> Warte auf MinIO (kann bis zu 3 Min dauern bei erstem Start) …"
 RETRY=0
-until curl -sf "http://localhost:9002/minio/health/live" >/dev/null 2>&1; do
+until curl -sf --max-time 5 "http://localhost:9002/minio/health/live" >/dev/null 2>&1; do
   RETRY=$((RETRY + 1))
-  if [ "${RETRY}" -ge 40 ]; then
-    echo "⚠  MinIO hat sich nach 40 Versuchen nicht gemeldet — trotzdem weiter"
+  MINIO_STATE=$(docker service ps "${STACK}_minio" --format '{{.CurrentState}}' 2>/dev/null | head -1 || echo 'unbekannt')
+  if [ "${RETRY}" -ge 60 ]; then
+    echo "⚠  MinIO nach 60 Versuchen nicht erreichbar (Status: ${MINIO_STATE})"
+    echo "   Prüfe: docker service ps mealplaner_minio --no-trunc"
     break
   fi
-  echo "   Versuch ${RETRY}/40 …"
+  echo "   Versuch ${RETRY}/60 — MinIO: ${MINIO_STATE}"
   sleep 3
 done
-echo "   MinIO ist bereit."
 
-# ── 4. Bucket anlegen (idempotent via MC-Container) ───────────────────────────
-echo "==> Stelle Bucket '${MINIO_BUCKET}' sicher …"
-docker run --rm \
-  --network "${STACK}_internal" \
-  --entrypoint sh \
-  minio/mc \
-  -c "mc alias set myminio http://minio:9000 '${MINIO_ACCESS_KEY}' '${MINIO_SECRET_KEY}' \
-      && mc mb --ignore-existing 'myminio/${MINIO_BUCKET}' \
-      && echo '[minio] Bucket OK'" \
-  || echo "⚠  Bucket-Anlage via MC fehlgeschlagen — App erstellt ihn beim Start selbst"
+if curl -sf --max-time 5 "http://localhost:9002/minio/health/live" >/dev/null 2>&1; then
+  echo "   MinIO ist bereit."
+
+  # ── 4. Bucket anlegen (via minio/mc mit Host-Netzwerk → Port 9002) ──────────
+  echo "==> Stelle Bucket '${MINIO_BUCKET}' sicher …"
+  docker run --rm \
+    --network host \
+    --entrypoint sh \
+    quay.io/minio/mc \
+    -c "mc alias set myminio http://localhost:9002 '${MINIO_ACCESS_KEY}' '${MINIO_SECRET_KEY}' \
+        && mc mb --ignore-existing 'myminio/${MINIO_BUCKET}' \
+        && echo '[minio] Bucket OK'" \
+    || echo "⚠  Bucket-Anlage via MC fehlgeschlagen — App erstellt ihn beim Start selbst"
+fi
 
 # ── 5. App-Service neu starten damit das neue Image geladen wird ──────────────
-# docker stack deploy mit :latest-Tag startet laufende Services NICHT neu.
 echo "==> Starte App-Service neu …"
 docker service update --force "${STACK}_app"
 
