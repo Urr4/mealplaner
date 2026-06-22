@@ -135,7 +135,7 @@ setup_directories() {
       sudo mkdir -p "${path}"
     fi
     local perms
-    perms=$(stat -c "%a" "${path}")
+    perms=$(sudo stat -c "%a" "${path}")
     if [[ "${perms}" != "777" ]]; then
       info "Setze Berechtigungen auf ${path} (war ${perms})..."
       sudo chmod 777 "${path}"
