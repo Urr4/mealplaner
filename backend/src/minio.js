@@ -1,4 +1,4 @@
-const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, CreateBucketCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 const isLocal = () => (process.env.STORAGE_TYPE || 'minio') === 'local';
@@ -16,9 +16,33 @@ function getClient() {
   });
 }
 
+async function ensureBucketExists(client) {
+  try {
+    await client.send(new CreateBucketCommand({ Bucket: BUCKET }));
+    console.log(`[minio] Bucket "${BUCKET}" erstellt`);
+  } catch (err) {
+    const code = err.Code || err.name || '';
+    if (code !== 'BucketAlreadyOwnedByYou' && code !== 'BucketAlreadyExists') {
+      throw err;
+    }
+  }
+}
+
 async function uploadImage(key, buffer, mimetype) {
   if (isLocal()) return require('./local-storage').uploadImage(key, buffer, mimetype);
-  await getClient().send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: buffer, ContentType: mimetype }));
+  const client = getClient();
+  try {
+    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: buffer, ContentType: mimetype }));
+  } catch (err) {
+    // Bucket missing — create it and retry once
+    if (err.Code === 'NoSuchBucket' || err.name === 'NoSuchBucket' || err.$metadata?.httpStatusCode === 404) {
+      console.log(`[minio] Bucket fehlt beim Upload — erstelle und versuche erneut`);
+      await ensureBucketExists(client);
+      await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: buffer, ContentType: mimetype }));
+    } else {
+      throw err;
+    }
+  }
 }
 
 async function deleteImage(key) {

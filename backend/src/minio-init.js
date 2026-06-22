@@ -36,12 +36,12 @@ async function ensureBucket() {
         console.log(`[minio] Bucket "${BUCKET}" existiert bereits`);
         return;
       }
-      console.warn(`[minio] Noch nicht bereit (Versuch ${attempt}/${MAX_ATTEMPTS}): ${err.message}`);
+      console.warn(`[minio] Versuch ${attempt}/${MAX_ATTEMPTS} fehlgeschlagen — code="${code}" msg="${err.message}"`);
       if (attempt < MAX_ATTEMPTS) await sleep(RETRY_DELAY_MS);
     }
   }
 
-  console.error(`[minio] Bucket "${BUCKET}" konnte nach ${MAX_ATTEMPTS} Versuchen nicht erstellt werden`);
+  console.error(`[minio] Bucket "${BUCKET}" konnte nach ${MAX_ATTEMPTS} Versuchen nicht erstellt werden — wird beim ersten Upload on-demand erstellt`);
 }
 
 module.exports = { ensureBucket };
