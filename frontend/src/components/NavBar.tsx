@@ -9,6 +9,22 @@ export default function NavBar() {
   const location = useLocation();
   const isActive = (path: string) => location.pathname.startsWith(path);
 
+  const navBtn = (label: string, path: string, icon: React.ReactNode) => (
+    <Button
+      color="inherit"
+      startIcon={icon}
+      onClick={() => navigate(path)}
+      sx={{
+        fontWeight: isActive(path) ? 700 : 400,
+        borderBottom: isActive(path) ? '2px solid white' : '2px solid transparent',
+        borderRadius: 0,
+        pb: '2px',
+      }}
+    >
+      {label}
+    </Button>
+  );
+
   return (
     <AppBar position="sticky" elevation={0} sx={{ bgcolor: 'primary.main' }}>
       <Toolbar sx={{ maxWidth: 1200, width: '100%', mx: 'auto', px: { xs: 2, sm: 3 } }}>
@@ -21,19 +37,12 @@ export default function NavBar() {
             Mealplaner
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button color="inherit" startIcon={<RestaurantMenuIcon />} onClick={() => navigate('/recipes')}
-            sx={{ fontWeight: isActive('/recipes') ? 700 : 400, borderBottom: isActive('/recipes') ? '2px solid white' : '2px solid transparent', borderRadius: 0, pb: '2px' }}>
-            Rezepte
-          </Button>
-          <Button color="inherit" startIcon={<CalendarMonthIcon />} onClick={() => navigate('/mealplan')}
-            sx={{ fontWeight: isActive('/mealplan') ? 700 : 400, borderBottom: isActive('/mealplan') ? '2px solid white' : '2px solid transparent', borderRadius: 0, pb: '2px' }}>
-            Wochenplan
-          </Button>
-          <Button color="inherit" startIcon={<SettingsIcon />} onClick={() => navigate('/settings')}
-            sx={{ fontWeight: isActive('/settings') ? 700 : 400, borderBottom: isActive('/settings') ? '2px solid white' : '2px solid transparent', borderRadius: 0, pb: '2px' }}>
-            Einstellungen
-          </Button>
+
+        {/* Desktop nav — hidden on mobile (bottom nav takes over) */}
+        <Box sx={{ display: { xs: 'none', sm: 'flex' }, gap: 1 }}>
+          {navBtn('Wochenplan', '/mealplan', <CalendarMonthIcon />)}
+          {navBtn('Rezepte', '/recipes', <RestaurantMenuIcon />)}
+          {navBtn('Einstellungen', '/settings', <SettingsIcon />)}
         </Box>
       </Toolbar>
     </AppBar>

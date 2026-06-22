@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Box, Container, Typography, TextField, Grid, Button,
-  InputAdornment, CircularProgress, Alert, Fab
+  InputAdornment, CircularProgress, Alert, Fab, useMediaQuery, useTheme
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import GrassIcon from '@mui/icons-material/Grass';
@@ -13,6 +13,8 @@ import RecipeCard from '../components/RecipeCard';
 
 export default function RecipeListPage() {
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [nameQuery, setNameQuery] = useState('');
   const [ingredientQuery, setIngredientQuery] = useState('');
@@ -52,24 +54,28 @@ export default function RecipeListPage() {
 
   return (
     <Box sx={{ bgcolor: 'background.default', minHeight: 'calc(100vh - 64px)' }}>
+      {/* Hero / search — compact on mobile */}
       <Box
         sx={{
           background: 'linear-gradient(135deg, #E8440A 0%, #F5A623 100%)',
-          py: { xs: 4, md: 6 },
+          py: { xs: 2, md: 6 },
           px: 2,
           textAlign: 'center',
         }}
       >
-        <Typography variant="h3" sx={{ color: 'white', mb: 1 }}>
-          Deine Rezepte
-        </Typography>
-        <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.85)', mb: 3 }}>
-          Nach Rezeptname oder Zutat suchen
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 2, maxWidth: 760, mx: 'auto', flexDirection: { xs: 'column', sm: 'row' } }}>
+        {!isMobile && (
+          <>
+            <Typography variant="h3" sx={{ color: 'white', mb: 1 }}>Deine Rezepte</Typography>
+            <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.85)', mb: 3 }}>
+              Nach Rezeptname oder Zutat suchen
+            </Typography>
+          </>
+        )}
+        <Box sx={{ display: 'flex', gap: 1, maxWidth: 760, mx: 'auto', flexDirection: { xs: 'column', sm: 'row' } }}>
           <TextField
             fullWidth
-            placeholder="Rezeptname suchen…"
+            size={isMobile ? 'small' : 'medium'}
+            placeholder="Rezeptname…"
             value={nameQuery}
             onChange={e => setNameQuery(e.target.value)}
             slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon sx={{ color: 'primary.main' }} /></InputAdornment> } }}
@@ -77,7 +83,8 @@ export default function RecipeListPage() {
           />
           <TextField
             fullWidth
-            placeholder="Nach Zutat filtern…"
+            size={isMobile ? 'small' : 'medium'}
+            placeholder="Nach Zutat…"
             value={ingredientQuery}
             onChange={e => setIngredientQuery(e.target.value)}
             slotProps={{ input: { startAdornment: <InputAdornment position="start"><GrassIcon sx={{ color: 'secondary.main' }} /></InputAdornment> } }}
@@ -86,8 +93,8 @@ export default function RecipeListPage() {
         </Box>
       </Box>
 
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+      <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 }, px: { xs: 1, sm: 3 } }}>
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -96,28 +103,23 @@ export default function RecipeListPage() {
         ) : recipes.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 8 }}>
             <Typography variant="h2" sx={{ fontSize: 64, mb: 2 }}>🍳</Typography>
-            <Typography variant="h5" color="text.secondary" sx={{ mb: 1 }}>
-              Keine Rezepte gefunden
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-              Lege dein erstes Rezept an!
-            </Typography>
-            <Button variant="contained" onClick={() => navigate('/recipes/new')}>
-              Rezept anlegen
-            </Button>
+            <Typography variant="h5" color="text.secondary" sx={{ mb: 1 }}>Keine Rezepte gefunden</Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>Lege dein erstes Rezept an!</Typography>
+            <Button variant="contained" onClick={() => navigate('/recipes/new')}>Rezept anlegen</Button>
           </Box>
         ) : (
           <>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               {recipes.length} Rezept{recipes.length !== 1 ? 'e' : ''} gefunden
             </Typography>
-            <Grid container spacing={3}>
+            <Grid container spacing={isMobile ? 1 : 3}>
               {recipes.map(recipe => (
-                <Grid key={recipe.id} size={{ xs: 12, sm: 6, md: 4 }}>
+                <Grid key={recipe.id} size={{ xs: 6, sm: 6, md: 4 }}>
                   <RecipeCard
                     recipe={recipe}
                     onEdit={id => navigate(`/recipes/${id}/edit`)}
                     onDelete={handleDelete}
+                    compact={isMobile}
                   />
                 </Grid>
               ))}
@@ -130,7 +132,7 @@ export default function RecipeListPage() {
         color="primary"
         aria-label="Rezept hinzufügen"
         onClick={() => navigate('/recipes/new')}
-        sx={{ position: 'fixed', bottom: 32, right: 32 }}
+        sx={{ position: 'fixed', bottom: { xs: 72, sm: 32 }, right: 24 }}
       >
         <AddIcon />
       </Fab>

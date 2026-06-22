@@ -12,9 +12,46 @@ interface Props {
   recipe: Recipe;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  compact?: boolean;
 }
 
-export default function RecipeCard({ recipe, onEdit, onDelete }: Props) {
+export default function RecipeCard({ recipe, onEdit, onDelete, compact = false }: Props) {
+  if (compact) {
+    return (
+      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {recipe.imageUrl ? (
+          <CardMedia component="img" image={recipe.imageUrl} alt={recipe.name}
+            sx={{ aspectRatio: '1/1', objectFit: 'cover', width: '100%' }} />
+        ) : (
+          <Box sx={{ aspectRatio: '1/1', bgcolor: '#FFF3E0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Typography sx={{ fontSize: 32 }}>🍽️</Typography>
+          </Box>
+        )}
+        <CardContent sx={{ p: 1, pb: '4px !important', flexGrow: 1 }}>
+          <Typography variant="body2" sx={{
+            fontFamily: '"Playfair Display", serif',
+            fontWeight: 600,
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            lineHeight: 1.3,
+          }}>
+            {recipe.name}
+          </Typography>
+        </CardContent>
+        <CardActions sx={{ justifyContent: 'flex-end', p: 0.5, pt: 0 }}>
+          <IconButton size="small" color="primary" onClick={() => onEdit(recipe.id)}>
+            <EditIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+          <IconButton size="small" color="error" onClick={() => onDelete(recipe.id)}>
+            <DeleteIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        </CardActions>
+      </Card>
+    );
+  }
+
   return (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {recipe.imageUrl ? (
