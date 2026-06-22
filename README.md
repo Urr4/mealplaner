@@ -5,14 +5,13 @@ Eine selbst-gehostete Wochenplan-App für die Familie.
 ## Übersicht
 
 ```
-LAN  ──►  Traefik (Port 80) ← vom taster-Stack bereitgestellt
-               │ http://pi1/mealplanner
-          mealplaner-app (Node/Express, intern Port 3001)
-               │
-          SQLite  (NFS — Synology NAS)
-          MinIO   (NFS — Synology NAS)  ← Rezept-Bilder
-               │ optional
-          Ollama  (http://Stefans-PC:11434)  ← Desktop-PC
+LAN  ──►  Port 3001
+           mealplaner-app (Node/Express)
+                │
+           SQLite  (NFS — Synology NAS)
+           MinIO   (NFS — Synology NAS)  ← Rezept-Bilder
+                │ optional
+           Ollama  (http://Stefans-PC:11434)  ← Desktop-PC
 ```
 
 ---
@@ -38,8 +37,9 @@ LAN  ──►  Traefik (Port 80) ← vom taster-Stack bereitgestellt
 |------------|---------|
 | **Raspberry Pi Swarm** | Pi1 = Manager |
 | **Synology NAS** | `192.168.178.62` — NFS-Share `/volume1/cloudstorage` |
-| **Traefik** | Läuft im `taster`-Stack (Port 80), routet `/mealplanner` zum App-Container |
 | **Desktop-PC** | Ollama unter `http://Stefans-PC:11434` |
+
+> Mealplaner ist eine reine LAN-App — kein Traefik, kein HTTPS, kein externer Zugriff nötig.
 
 ---
 
@@ -80,11 +80,10 @@ Das Skript erledigt automatisch:
 1. Docker und NFS-Tools installieren
 2. NFS-Share mounten und in `/etc/fstab` eintragen
 3. NAS-Verzeichnisse anlegen und Berechtigungen setzen
-4. Docker-Overlay-Netzwerk `web` sicherstellen
-5. Docker-Image bauen (ARM64 für Raspberry Pi, baut Frontend mit `/mealplanner` als Basispfad)
-6. Stack deployen
+4. Docker-Image bauen (ARM64 für Raspberry Pi)
+5. Stack deployen
 
-**Erreichbar unter: `http://pi1/mealplanner`**
+**Erreichbar unter: `http://pi1:3001`**
 
 ---
 
@@ -116,7 +115,6 @@ Im Dev-Modus:
 | **SQLite** | `data/dev.db` im Projektverzeichnis |
 | **Bilder** | Lokal in `data/images/` (kein MinIO nötig) |
 | **Ollama** | `http://localhost:11434` |
-| **Basispfad** | `/` (kein `/mealplanner` Präfix) |
 
 ---
 
@@ -176,8 +174,7 @@ cd ~/mealplaner
 
 ## Docker Swarm — Hinweise
 
-- **Netzwerk `web`**: Muss exakt `web` heißen (nicht `mealplaner_web`), damit Traefik aus dem taster-Stack den Service findet
-- **Traefik**: Kein eigener Traefik im mealplaner-Stack — der Traefik aus dem taster-Stack routet auch für mealplaner via `web`-Netzwerk
-- **Ports**: MinIO nutzt 9002 (API) und 9003 (Konsole). Kein Konflikt mit taster (nutzt 80, 8443, 3000)
+- **Netzwerk `internal`**: Internes Stack-Netzwerk, nur für die Kommunikation zwischen App und MinIO
+- **Ports**: App auf 3001, MinIO nutzt 9002 (API) und 9003 (Konsole). Kein Konflikt mit taster (nutzt 80, 443, 3000)
 - **SQLite auf NFS**: `noac`-Option verhindert inkonsistente Lesevorgänge
 
