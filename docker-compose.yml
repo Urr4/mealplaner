@@ -69,11 +69,11 @@ services:
       - "9002:9000"
       - "9003:9001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || wget -q --spider http://localhost:9000/minio/health/live"]
+      interval: 10s
       timeout: 5s
-      retries: 20
-      start_period: 10s
+      retries: 12
+      start_period: 15s
     deploy:
       replicas: 1
       restart_policy:
