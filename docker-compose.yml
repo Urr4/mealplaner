@@ -68,6 +68,12 @@ services:
       # Port 9002 (API) und 9003 (Konsole) — kein Konflikt mit taster (nutzt 80/8443/3000)
       - "9002:9000"
       - "9003:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
     deploy:
       replicas: 1
       restart_policy:
@@ -79,7 +85,8 @@ services:
 
 networks:
   internal:
-    driver: overlay   # internes Stack-Netzwerk für app ↔ minio Kommunikation
+    driver: overlay
+    attachable: true   # erlaubt docker run --network für Einmal-Container (z.B. mc für Bucket-Init)
 
 volumes:
   sqlite-data:
