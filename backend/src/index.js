@@ -57,10 +57,11 @@ start().catch(err => {
 });
 
 process.on('uncaughtException', err => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`[server] Port ${process.env.PORT || 3001} ist bereits belegt.`);
-    console.error('[server] Tipp: dev.sh wählt automatisch einen freien Port.');
-    process.exit(1);
-  }
-  throw err;
+  console.error('[server] Uncaught Exception — Server wird neu gestartet:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[server] Unhandled Rejection — Server wird neu gestartet:', reason);
+  process.exit(1);
 });
