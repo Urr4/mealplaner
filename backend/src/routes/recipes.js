@@ -3,6 +3,7 @@ const multer = require('multer');
 const { query, uuidv4 } = require('../db');
 const { uploadImage, deleteImage, getImageUrl } = require('../minio');
 const ollama = require('../ollama');
+const { extractRecipeText } = require('../recipe-scraper');
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -199,6 +200,76 @@ router.post('/parse/text', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: `Fehler beim Verarbeiten des Textes: ${err.message}` });
+  }
+});
+
+// ── POST /api/recipes/parse/url ───────────────────────────────────────────────
+router.post('/parse/url', async (req, res) => {
+  try {
+    const { downloading } = ollama.getStatus();
+    if (downloading) return res.status(503).json({ error: 'Nicht verfügbar, nötige Systeme werden installiert' });
+    if (!await ollama.isAvailable()) {
+      return res.status(503).json({ error: 'Das Feature ist nur verfügbar, wenn der PC eingeschaltet ist' });
+    }
+
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: 'URL ist erforderlich' });
+
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+      if (!['http:', 'https:'].includes(parsedUrl.protocol)) throw new Error('invalid protocol');
+    } catch {
+      return res.status(400).json({ error: 'Rezept auslesen nicht möglich, weil die URL ungültig ist' });
+    }
+
+    const { default: fetch } = await import('node-fetch');
+    let response;
+    try {
+      response = await fetch(parsedUrl.toString(), {
+        redirect: 'follow',
+        signal: AbortSignal.timeout(15000),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; MealplanerBot/1.0; +https://github.com/)',
+          'Accept': 'text/html,application/xhtml+xml',
+        },
+      });
+    } catch (err) {
+      return res.status(502).json({ error: `Rezept auslesen nicht möglich, weil die Seite nicht erreichbar ist (${err.message})` });
+    }
+
+    if (!response.ok) {
+      return res.status(502).json({ error: `Rezept auslesen nicht möglich, weil die Seite nicht erreichbar ist (Status ${response.status})` });
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('html')) {
+      return res.status(422).json({ error: 'Rezept auslesen nicht möglich, weil die Seite keine HTML-Seite ist' });
+    }
+
+    const html = await response.text();
+
+    let text;
+    try {
+      text = extractRecipeText(html, parsedUrl.toString());
+    } catch (err) {
+      console.error(err);
+      text = null;
+    }
+
+    if (!text || text.trim().length < 150) {
+      return res.status(422).json({ error: 'Rezept auslesen nicht möglich, weil auf der Seite kein Rezept gefunden wurde' });
+    }
+
+    try {
+      const result = await ollama.parseRecipeFromWebpage(text);
+      res.json(result);
+    } catch (err) {
+      return res.status(422).json({ error: `Rezept auslesen nicht möglich, weil ${err.message}` });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: `Fehler beim Auslesen des Rezepts: ${err.message}` });
   }
 });
 

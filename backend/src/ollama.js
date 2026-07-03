@@ -66,11 +66,18 @@ async function pullModel(modelName) {
 }
 
 /**
- * Called once at startup. Checks which required models are installed and
- * downloads any that are missing. Updates modelStatus so the API can expose
- * the progress to the frontend.
+ * Checks which required models are installed and downloads any that are
+ * missing. Called once at startup, and again whenever the Ollama settings
+ * (URL / model names) are changed — so a PC that was off at boot, or a newly
+ * selected model, gets picked up without requiring a server restart.
+ * Updates modelStatus so the API can expose the progress to the frontend.
  */
 async function ensureModels() {
+  if (modelStatus.downloading) {
+    console.log('[ollama] Modell-Download läuft bereits — überspringe erneuten Start');
+    return;
+  }
+
   if (!await isAvailable()) {
     console.log('[ollama] Nicht erreichbar — überspringe Modell-Setup');
     return;
@@ -172,4 +179,42 @@ Diktierter Text: ${dictatedText}`;
   return JSON.parse(jsonMatch[0]);
 }
 
-module.exports = { isAvailable, getStatus, ensureModels, parseRecipeFromImage, parseRecipeFromText };
+async function parseRecipeFromWebpage(plainText) {
+  const { default: fetch } = await import('node-fetch');
+  const prompt = `Du bist ein Koch-Assistent. Dir wird der Inhalt einer Webseite gegeben, die möglicherweise ein Rezept enthält.
+Falls du darin ein echtes Rezept (mit Zutaten UND Zubereitungsschritten) erkennen kannst, antworte NUR mit einem gültigen JSON-Objekt in folgendem Format, ohne zusätzlichen Text:
+{
+  "name": "Name des Rezepts",
+  "description": "Kurze Beschreibung (1-2 Sätze)",
+  "ingredients": [{"name": "Zutat", "quantity": "Menge", "unit": "Einheit"}],
+  "steps": ["Schritt 1", "Schritt 2"]
+}
+
+Falls du KEIN Rezept (oder keine Zutaten/Zubereitungsschritte) im Text erkennen kannst, antworte NUR mit folgendem JSON-Objekt, ohne zusätzlichen Text:
+{"error": "<kurzer, verständlicher Grund auf Deutsch, warum kein Rezept erkannt werden konnte>"}
+
+Seiteninhalt:
+${plainText}`;
+
+  const res = await fetch(`${OLLAMA_BASE()}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: TEXT_MODEL(),
+      prompt,
+      stream: false,
+    }),
+    signal: AbortSignal.timeout(90000),
+  });
+
+  if (!res.ok) throw new Error(`Ollama Fehler: ${res.status}`);
+  const data = await res.json();
+
+  const jsonMatch = data.response.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('Kein gültiges JSON in der Antwort');
+  const parsed = JSON.parse(jsonMatch[0]);
+  if (parsed.error) throw new Error(parsed.error);
+  return parsed;
+}
+
+module.exports = { isAvailable, getStatus, ensureModels, parseRecipeFromImage, parseRecipeFromText, parseRecipeFromWebpage };

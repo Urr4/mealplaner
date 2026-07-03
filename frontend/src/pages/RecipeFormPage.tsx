@@ -10,6 +10,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import MicIcon from '@mui/icons-material/Mic';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
+import LinkIcon from '@mui/icons-material/Link';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
@@ -22,7 +24,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import type { RecipeIngredient, RecipeStep, Person, ParsedRecipe } from '../types';
 import {
   getRecipe, createRecipe, updateRecipe, uploadImage,
-  parseRecipeFromImage, parseRecipeFromText,
+  parseRecipeFromImage, parseRecipeFromText, parseRecipeFromUrl,
   getOllamaStatus, getPersons, createPerson, getCanonicalUnits, getUsedUnits,
 } from '../api/client';
 
@@ -56,6 +58,8 @@ export default function RecipeFormPage() {
   const [ollamaStatus, setOllamaStatus] = useState<{ available: boolean; downloading: boolean; modelsReady: boolean } | null>(null);
   const [dictationText, setDictationText] = useState('');
   const [dictationDialogOpen, setDictationDialogOpen] = useState(false);
+  const [recipeUrl, setRecipeUrl] = useState('');
+  const [urlDialogOpen, setUrlDialogOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [interimText, setInterimText] = useState('');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -215,6 +219,23 @@ export default function RecipeFormPage() {
     } finally { setParsing(false); }
   };
 
+  const closeUrlDialog = () => {
+    setUrlDialogOpen(false);
+    setRecipeUrl('');
+  };
+
+  const handleParseUrl = async () => {
+    const url = recipeUrl.trim();
+    if (!url) return;
+    setParsing(true); setError(null);
+    try {
+      applyParsed(await parseRecipeFromUrl(url));
+      closeUrlDialog();
+    } catch (err: unknown) {
+      setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Fehler beim Auslesen des Rezepts');
+    } finally { setParsing(false); }
+  };
+
   const handleSave = async () => {
     if (!name.trim()) { setError('Name ist erforderlich'); return; }
     setSaving(true); setError(null);
@@ -310,6 +331,30 @@ export default function RecipeFormPage() {
                     </Button>
                   </span>
                 </Tooltip>
+                <Tooltip title="Nicht verfügbar, nötige Systeme werden installiert">
+                  <span>
+                    <Button variant="outlined" startIcon={<AddPhotoAlternateIcon />}
+                      disabled
+                      sx={{
+                        bgcolor: 'rgba(255,255,255,0.15)', color: 'white', borderColor: 'rgba(255,255,255,0.5)',
+                        '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)', borderColor: 'rgba(255,255,255,0.15)' },
+                      }}>
+                      Rezept von Bild
+                    </Button>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Nicht verfügbar, nötige Systeme werden installiert">
+                  <span>
+                    <Button variant="outlined" startIcon={<LinkIcon />}
+                      disabled
+                      sx={{
+                        bgcolor: 'rgba(255,255,255,0.15)', color: 'white', borderColor: 'rgba(255,255,255,0.5)',
+                        '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)', borderColor: 'rgba(255,255,255,0.15)' },
+                      }}>
+                      Rezept von Link
+                    </Button>
+                  </span>
+                </Tooltip>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.9)', alignSelf: 'center' }}>
                   ⏳ Nicht verfügbar, nötige Systeme werden installiert
                 </Typography>
@@ -329,6 +374,38 @@ export default function RecipeFormPage() {
                       }}
                     >
                       Rezept diktieren
+                    </Button>
+                  </span>
+                </Tooltip>
+                <Tooltip title={!ollamaStatus?.available ? 'Das Feature ist nur verfügbar, wenn der PC eingeschaltet ist' : ''}>
+                  <span>
+                    <Button
+                      variant="outlined"
+                      startIcon={<AddPhotoAlternateIcon />}
+                      disabled={!ollamaStatus?.modelsReady || parsing}
+                      onClick={() => parseImageInputRef.current?.click()}
+                      sx={{
+                        bgcolor: 'rgba(255,255,255,0.15)', color: 'white', borderColor: 'rgba(255,255,255,0.5)',
+                        '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)', borderColor: 'rgba(255,255,255,0.15)' },
+                      }}
+                    >
+                      Rezept von Bild
+                    </Button>
+                  </span>
+                </Tooltip>
+                <Tooltip title={!ollamaStatus?.available ? 'Das Feature ist nur verfügbar, wenn der PC eingeschaltet ist' : ''}>
+                  <span>
+                    <Button
+                      variant="outlined"
+                      startIcon={<LinkIcon />}
+                      disabled={!ollamaStatus?.modelsReady || parsing}
+                      onClick={() => setUrlDialogOpen(true)}
+                      sx={{
+                        bgcolor: 'rgba(255,255,255,0.15)', color: 'white', borderColor: 'rgba(255,255,255,0.5)',
+                        '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)', borderColor: 'rgba(255,255,255,0.15)' },
+                      }}
+                    >
+                      Rezept von Link
                     </Button>
                   </span>
                 </Tooltip>
@@ -606,6 +683,33 @@ export default function RecipeFormPage() {
           <Button variant="contained" onClick={handleParseDictation}
             disabled={parsing || !dictationText.trim()}
             startIcon={parsing ? <CircularProgress size={16} color="inherit" /> : <MicIcon />}>
+            {parsing ? 'Verarbeite…' : 'Rezept erstellen'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Link Dialog */}
+      <Dialog open={urlDialogOpen} onClose={closeUrlDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Rezept von Link</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Füge den Link zu einem Rezept im Internet ein — die KI liest die Seite aus und erstellt daraus ein Rezept.
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Rezept-URL"
+            placeholder="https://www.beispiel-rezepte.de/mein-rezept"
+            value={recipeUrl}
+            onChange={e => setRecipeUrl(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && recipeUrl.trim() && !parsing) handleParseUrl(); }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeUrlDialog}>Abbrechen</Button>
+          <Button variant="contained" onClick={handleParseUrl}
+            disabled={parsing || !recipeUrl.trim()}
+            startIcon={parsing ? <CircularProgress size={16} color="inherit" /> : <LinkIcon />}>
             {parsing ? 'Verarbeite…' : 'Rezept erstellen'}
           </Button>
         </DialogActions>

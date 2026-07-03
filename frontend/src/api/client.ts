@@ -41,6 +41,9 @@ export const parseRecipeFromImage = (file: File) => {
 export const parseRecipeFromText = (text: string) =>
   api.post<ParsedRecipe>('/recipes/parse/text', { text }).then(r => r.data);
 
+export const parseRecipeFromUrl = (url: string) =>
+  api.post<ParsedRecipe>('/recipes/parse/url', { url }).then(r => r.data);
+
 export const getOllamaStatus = () =>
   api.get<{ available: boolean; downloading: boolean; modelsReady: boolean; error: string | null }>('/recipes/ollama/status').then(r => r.data);
 
