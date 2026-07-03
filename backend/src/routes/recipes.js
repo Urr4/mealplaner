@@ -133,8 +133,12 @@ router.get('/ollama/status', async (req, res) => {
   const { downloading, modelsReady, error } = ollama.getStatus();
 
   // Self-heal: if ollama just became reachable but ensureModels never completed
-  // (e.g. it was unreachable at container startup), kick it off now.
-  if (available && !modelsReady && !downloading) {
+  // (e.g. it was unreachable at container startup), kick it off now. Skip if a
+  // previous attempt already failed — retrying automatically on every poll
+  // would hammer the Ollama server with the same failing pull request. A fresh
+  // attempt is triggered by saving Settings (see routes/settings.js) or a
+  // backend restart.
+  if (available && !modelsReady && !downloading && !error) {
     ollama.ensureModels().catch(err =>
       console.error('[ollama] ensureModels Fehler:', err.message)
     );

@@ -12,16 +12,22 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [ollamaStatus, setOllamaStatus] = useState<{ available: boolean; downloading: boolean; modelsReady: boolean } | null>(null);
+  const [ollamaStatus, setOllamaStatus] = useState<{ available: boolean; downloading: boolean; modelsReady: boolean; error?: string | null } | null>(null);
 
   useEffect(() => {
     getSettings().then(setSettings).catch(() => setError('Einstellungen konnten nicht geladen werden'));
   }, []);
 
   useEffect(() => {
-    getOllamaStatus()
-      .then(setOllamaStatus)
-      .catch(() => setOllamaStatus({ available: false, downloading: false, modelsReady: false }));
+    const fetchStatus = () =>
+      getOllamaStatus()
+        .then(setOllamaStatus)
+        .catch(() => setOllamaStatus({ available: false, downloading: false, modelsReady: false }));
+
+    fetchStatus();
+    // Poll so the indicator reflects the PC being turned on/off without a page reload
+    const interval = setInterval(fetchStatus, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleSave = async () => {
@@ -44,6 +50,7 @@ export default function SettingsPage() {
     if (ollamaStatus === null) return { color: '#9e9e9e', label: 'Status wird geladen…' };
     if (ollamaStatus.downloading) return { color: '#ff9800', label: 'Modelle werden heruntergeladen…' };
     if (ollamaStatus.modelsReady) return { color: '#4caf50', label: 'Ollama erreichbar und bereit' };
+    if (ollamaStatus.error) return { color: '#f44336', label: `Modell-Download fehlgeschlagen: ${ollamaStatus.error}` };
     if (ollamaStatus.available) return { color: '#ff9800', label: 'Ollama erreichbar, Modelle werden vorbereitet…' };
     return { color: '#f44336', label: 'Ollama nicht erreichbar' };
   };
@@ -97,11 +104,12 @@ export default function SettingsPage() {
               placeholder="llava:7b"
             />
             <TextField
-              label="Text-Modell (für Diktat)"
+              label="Text-Modell (für Diktat & Link-Import)"
               fullWidth
               value={settings.ollama_text_model || ''}
               onChange={e => set('ollama_text_model', e.target.value)}
               placeholder="llama3.2:3b"
+              helperText="Wird für 'Rezept diktieren' und 'Rezept von Link' verwendet"
             />
           </Stack>
         </Paper>

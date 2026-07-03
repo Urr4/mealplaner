@@ -55,7 +55,7 @@ export default function RecipeFormPage() {
   const [persons, setPersons] = useState<Person[]>([]);
   const [newPersonName, setNewPersonName] = useState('');
   const [personDialogOpen, setPersonDialogOpen] = useState(false);
-  const [ollamaStatus, setOllamaStatus] = useState<{ available: boolean; downloading: boolean; modelsReady: boolean } | null>(null);
+  const [ollamaStatus, setOllamaStatus] = useState<{ available: boolean; downloading: boolean; modelsReady: boolean; error?: string | null } | null>(null);
   const [dictationText, setDictationText] = useState('');
   const [dictationDialogOpen, setDictationDialogOpen] = useState(false);
   const [recipeUrl, setRecipeUrl] = useState('');
@@ -300,6 +300,16 @@ export default function RecipeFormPage() {
 
   const UNITS = usedUnits;
 
+  /** Explains why the KI buttons are disabled — PC off, or a model download failure. */
+  const ollamaUnavailableReason = !ollamaStatus?.available
+    ? 'Das Feature ist nur verfügbar, wenn der PC eingeschaltet ist'
+    : ollamaStatus?.error
+      ? `Modell-Download fehlgeschlagen: ${ollamaStatus.error}`
+      : !ollamaStatus?.modelsReady
+        ? 'Benötigte Modelle werden noch vorbereitet'
+        : '';
+
+
   /** Accepts: integers, decimals (. or ,), fractions (3/4). Rejects everything else. */
   const isValidQuantity = (val: string) => val === '' || /^[\d.,/]+$/.test(val);
 
@@ -361,7 +371,7 @@ export default function RecipeFormPage() {
               </>
             ) : (
               <>
-                <Tooltip title={!ollamaStatus?.available ? 'Das Feature ist nur verfügbar, wenn der PC eingeschaltet ist' : ''}>
+                <Tooltip title={ollamaUnavailableReason}>
                   <span>
                     <Button
                       variant="outlined"
@@ -377,7 +387,7 @@ export default function RecipeFormPage() {
                     </Button>
                   </span>
                 </Tooltip>
-                <Tooltip title={!ollamaStatus?.available ? 'Das Feature ist nur verfügbar, wenn der PC eingeschaltet ist' : ''}>
+                <Tooltip title={ollamaUnavailableReason}>
                   <span>
                     <Button
                       variant="outlined"
@@ -393,7 +403,7 @@ export default function RecipeFormPage() {
                     </Button>
                   </span>
                 </Tooltip>
-                <Tooltip title={!ollamaStatus?.available ? 'Das Feature ist nur verfügbar, wenn der PC eingeschaltet ist' : ''}>
+                <Tooltip title={ollamaUnavailableReason}>
                   <span>
                     <Button
                       variant="outlined"
@@ -409,9 +419,9 @@ export default function RecipeFormPage() {
                     </Button>
                   </span>
                 </Tooltip>
-                {ollamaStatus?.available === false && (
+                {ollamaUnavailableReason && (
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)', alignSelf: 'center' }}>
-                    ⚠️ Das Feature ist nur verfügbar, wenn der PC eingeschaltet ist
+                    ⚠️ {ollamaUnavailableReason}
                   </Typography>
                 )}
               </>
