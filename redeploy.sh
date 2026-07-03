@@ -22,9 +22,12 @@ docker stack deploy -c "${SCRIPT_DIR}/docker-compose.yml" "${STACK}"
 
 # ── 3. App-Service auf neues Image aktualisieren ──────────────────────────────
 # docker stack deploy mit :latest-Tag startet laufende Services NICHT neu.
-# --image erzwingt die Nutzung des gerade gebauten Images.
+# --image erzwingt die Nutzung des gerade gebauten Images. Da sich der Tag-String
+# ("mealplaner:latest") nie ändert, hält Swarm den Service-Spec sonst für
+# unverändert und startet den laufenden Task NICHT neu — --force erzwingt den
+# Neustart, damit das frisch gebaute Image auch wirklich verwendet wird.
 echo "==> Aktualisiere App-Service auf neues Image …"
-docker service update --image "${IMAGE}" "${STACK}_app"
+docker service update --force --image "${IMAGE}" "${STACK}_app"
 
 echo ""
 echo "✓ Deployment abgeschlossen. Erreichbar unter: http://pi1:3001"

@@ -131,6 +131,15 @@ router.post('/', async (req, res) => {
 router.get('/ollama/status', async (req, res) => {
   const available = await ollama.isAvailable();
   const { downloading, modelsReady, error } = ollama.getStatus();
+
+  // Self-heal: if ollama just became reachable but ensureModels never completed
+  // (e.g. it was unreachable at container startup), kick it off now.
+  if (available && !modelsReady && !downloading) {
+    ollama.ensureModels().catch(err =>
+      console.error('[ollama] ensureModels Fehler:', err.message)
+    );
+  }
+
   res.json({ available, downloading, modelsReady, error });
 });
 

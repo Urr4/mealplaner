@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
   Box, Container, Typography, TextField, Button, Paper,
-  Alert, CircularProgress, Stack
+  Alert, CircularProgress, Stack, Tooltip
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
-import { getSettings, saveSettings } from '../api/client';
+import { getSettings, saveSettings, getOllamaStatus } from '../api/client';
 import type { Settings } from '../types';
 
 export default function SettingsPage() {
@@ -12,9 +12,16 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [ollamaStatus, setOllamaStatus] = useState<{ available: boolean; downloading: boolean; modelsReady: boolean } | null>(null);
 
   useEffect(() => {
     getSettings().then(setSettings).catch(() => setError('Einstellungen konnten nicht geladen werden'));
+  }, []);
+
+  useEffect(() => {
+    getOllamaStatus()
+      .then(setOllamaStatus)
+      .catch(() => setOllamaStatus({ available: false, downloading: false, modelsReady: false }));
   }, []);
 
   const handleSave = async () => {
@@ -23,13 +30,25 @@ export default function SettingsPage() {
       await saveSettings(settings);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
+      // Refresh status after saving since URL/model may have changed
+      getOllamaStatus().then(setOllamaStatus).catch(() => {});
     } catch {
-      setError('Einstellungen konnten nicht gespeichert werden');
+      setError('Einstellungen konnden nicht gespeichert werden');
     } finally { setSaving(false); }
   };
 
   const set = (key: keyof Settings, value: string) =>
     setSettings(prev => ({ ...prev, [key]: value }));
+
+  const statusDot = () => {
+    if (ollamaStatus === null) return { color: '#9e9e9e', label: 'Status wird geladen…' };
+    if (ollamaStatus.downloading) return { color: '#ff9800', label: 'Modelle werden heruntergeladen…' };
+    if (ollamaStatus.modelsReady) return { color: '#4caf50', label: 'Ollama erreichbar und bereit' };
+    if (ollamaStatus.available) return { color: '#ff9800', label: 'Ollama erreichbar, Modelle werden vorbereitet…' };
+    return { color: '#f44336', label: 'Ollama nicht erreichbar' };
+  };
+
+  const { color, label } = statusDot();
 
   return (
     <Box sx={{ bgcolor: 'background.default', minHeight: 'calc(100vh - 64px)' }}>
@@ -46,9 +65,21 @@ export default function SettingsPage() {
 
         {/* Ollama */}
         <Paper sx={{ p: 3, mb: 3, borderRadius: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2, fontFamily: '"Playfair Display", serif' }}>
-            🤖 KI (Ollama)
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6" sx={{ fontFamily: '"Playfair Display", serif' }}>
+              🤖 KI (Ollama)
+            </Typography>
+            <Tooltip title={label}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'default' }}>
+                <Box sx={{
+                  width: 12, height: 12, borderRadius: '50%',
+                  bgcolor: color,
+                  boxShadow: `0 0 6px ${color}`,
+                }} />
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>{label}</Typography>
+              </Box>
+            </Tooltip>
+          </Box>
           <Stack spacing={2}>
             <TextField
               label="Ollama URL"
@@ -90,5 +121,3 @@ export default function SettingsPage() {
     </Box>
   );
 }
-
-
