@@ -40,6 +40,7 @@ async function enrichRecipe(recipe) {
     description: recipe.description,
     imageUrl,
     imageId: recipe.image_id,
+    category: recipe.category || 'main',
     ingredients,
     steps,
     likedBy: persons.filter(p => p.preference === 'liked').map(p => ({ id: p.id, name: p.name })),
@@ -79,6 +80,8 @@ function savePersonPreferences(recipeId, likedBy, dislikedBy) {
   }
 }
 
+const normalizeCategory = category => (category === 'other' ? 'other' : 'main');
+
 // ── GET /api/recipes ──────────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
@@ -110,11 +113,11 @@ router.get('/', async (req, res) => {
 // ── POST /api/recipes ─────────────────────────────────────────────────────────
 router.post('/', async (req, res) => {
   try {
-    const { name, description, ingredients, steps, likedBy, dislikedBy } = req.body;
+    const { name, description, ingredients, steps, likedBy, dislikedBy, category } = req.body;
     if (!name) return res.status(400).json({ error: 'Name ist erforderlich' });
 
     const id = uuidv4();
-    query('INSERT INTO recipes (id, name, description) VALUES (?, ?, ?)', [id, name, description || '']);
+    query('INSERT INTO recipes (id, name, description, category) VALUES (?, ?, ?, ?)', [id, name, description || '', normalizeCategory(category)]);
     if (ingredients?.length) saveIngredients(id, ingredients);
     if (steps?.length) saveSteps(id, steps);
     savePersonPreferences(id, likedBy, dislikedBy);
@@ -301,11 +304,11 @@ router.get('/:id', async (req, res) => {
 // ── PUT /api/recipes/:id ──────────────────────────────────────────────────────
 router.put('/:id', async (req, res) => {
   try {
-    const { name, description, ingredients, steps, likedBy, dislikedBy } = req.body;
+    const { name, description, ingredients, steps, likedBy, dislikedBy, category } = req.body;
     const existing = query('SELECT * FROM recipes WHERE id = ?', [req.params.id]).rows;
     if (!existing.length) return res.status(404).json({ error: 'Rezept nicht gefunden' });
 
-    query('UPDATE recipes SET name = ?, description = ? WHERE id = ?', [name, description || '', req.params.id]);
+    query('UPDATE recipes SET name = ?, description = ?, category = ? WHERE id = ?', [name, description || '', normalizeCategory(category), req.params.id]);
     if (ingredients !== undefined) saveIngredients(req.params.id, ingredients);
     if (steps !== undefined) saveSteps(req.params.id, steps);
     savePersonPreferences(req.params.id, likedBy, dislikedBy);

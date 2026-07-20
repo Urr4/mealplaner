@@ -31,6 +31,7 @@ function migrate() {
       name        TEXT NOT NULL,
       description TEXT NOT NULL DEFAULT '',
       image_id    TEXT,
+      category    TEXT NOT NULL DEFAULT 'main' CHECK(category IN ('main', 'other')),
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -63,6 +64,13 @@ function migrate() {
       no_match  INTEGER NOT NULL DEFAULT 0
     );
   `);
+
+  // Backfill `category` for databases created before this column existed.
+  const columns = _db.exec("PRAGMA table_info(recipes)");
+  const hasCategory = columns.length > 0 && columns[0].values.some(row => row[1] === 'category');
+  if (!hasCategory) {
+    _db.exec(`ALTER TABLE recipes ADD COLUMN category TEXT NOT NULL DEFAULT 'main' CHECK(category IN ('main', 'other'))`);
+  }
 }
 
 function query(sql, params = []) {
