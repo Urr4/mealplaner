@@ -3,7 +3,9 @@ import type { Recipe } from '../types';
 
 const MARGIN = 15;
 const PAGE_WIDTH = 210; // A4 portrait, mm
+const PAGE_HEIGHT = 297;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+const MAX_IMAGE_HEIGHT = 80; // mm — image is scaled down to fit, keeping its aspect ratio
 
 /** Loads an image URL into a data URL so jsPDF can embed it. */
 const toDataUrl = (url: string): Promise<string> =>
@@ -19,23 +21,45 @@ const toDataUrl = (url: string): Promise<string> =>
         }),
     );
 
-/** Builds a printable A4 recipe card PDF and returns it as an object URL. */
-export async function buildRecipePdf(recipe: Recipe): Promise<string> {
+/** Reads the natural pixel dimensions of a data URL image. */
+const getImageSize = (dataUrl: string): Promise<{ width: number; height: number }> =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+
+export interface RecipePdfOptions {
+  /** Whether to embed the recipe's photo. Defaults to true. */
+  includeImage?: boolean;
+}
+
+/** Builds a printable, black & white A4 recipe card PDF and returns it as an object URL. */
+export async function buildRecipePdf(recipe: Recipe, options: RecipePdfOptions = {}): Promise<string> {
+  const { includeImage = true } = options;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   let y = MARGIN;
 
-  // Image (if available)
-  if (recipe.imageUrl) {
+  // Image (if available and requested) — scaled to fit while keeping its aspect ratio
+  if (includeImage && recipe.imageUrl) {
     try {
       const dataUrl = await toDataUrl(recipe.imageUrl);
+      const { width, height } = await getImageSize(dataUrl);
       const format = dataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-      const imgHeight = 60;
-      doc.addImage(dataUrl, format, MARGIN, y, CONTENT_WIDTH, imgHeight, undefined, 'FAST');
-      y += imgHeight + 8;
+      const scale = Math.min(CONTENT_WIDTH / width, MAX_IMAGE_HEIGHT / height);
+      const drawWidth = width * scale;
+      const drawHeight = height * scale;
+      const x = MARGIN + (CONTENT_WIDTH - drawWidth) / 2;
+      doc.addImage(dataUrl, format, x, y, drawWidth, drawHeight, undefined, 'FAST');
+      y += drawHeight + 8;
     } catch {
       // Ignore image failures — continue with a text-only card.
     }
   }
+
+  // Everything below is plain black text / lines — printer-friendly by design.
+  doc.setTextColor(0);
 
   // Title
   doc.setFont('helvetica', 'bold');
@@ -55,13 +79,13 @@ export async function buildRecipePdf(recipe: Recipe): Promise<string> {
     doc.setTextColor(0);
   }
 
-  doc.setDrawColor(232, 68, 10);
-  doc.setLineWidth(0.6);
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.4);
   doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
   y += 8;
 
   const ensureSpace = (needed: number) => {
-    if (y + needed > 297 - MARGIN) {
+    if (y + needed > PAGE_HEIGHT - MARGIN) {
       doc.addPage();
       y = MARGIN;
     }

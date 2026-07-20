@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Box, Container, Typography, IconButton, Chip, Paper, Stack, Avatar,
   CircularProgress, Alert, Button,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  FormControlLabel, Checkbox,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
@@ -20,6 +22,8 @@ export default function RecipeViewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [includeImage, setIncludeImage] = useState(true);
 
   useEffect(() => {
     if (!id) return;
@@ -30,11 +34,23 @@ export default function RecipeViewPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handlePrint = useCallback(async () => {
+  const handlePrintClick = () => {
     if (!recipe) return;
+    // Skip the choice dialog when there's no image to choose about.
+    if (!recipe.imageUrl) {
+      handleGeneratePdf(false);
+      return;
+    }
+    setIncludeImage(true);
+    setPrintDialogOpen(true);
+  };
+
+  const handleGeneratePdf = useCallback(async (withImage: boolean) => {
+    if (!recipe) return;
+    setPrintDialogOpen(false);
     setPrinting(true);
     try {
-      const url = await buildRecipePdf(recipe);
+      const url = await buildRecipePdf(recipe, { includeImage: withImage });
       window.open(url, '_blank');
     } catch {
       setError('PDF konnte nicht erstellt werden.');
@@ -116,7 +132,7 @@ export default function RecipeViewPage() {
           fullWidth
           variant="contained"
           startIcon={printing ? <CircularProgress size={16} color="inherit" /> : <PrintIcon />}
-          onClick={handlePrint}
+          onClick={handlePrintClick}
           disabled={printing}
           sx={{ mb: 3 }}
         >
@@ -153,6 +169,36 @@ export default function RecipeViewPage() {
           </Stack>
         </Paper>
       </Container>
+
+      {/* Print options dialog */}
+      <Dialog open={printDialogOpen} onClose={() => setPrintDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Rezeptkarte drucken</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Soll das Bild in der PDF-Rezeptkarte enthalten sein?
+          </Typography>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={includeImage}
+                onChange={e => setIncludeImage(e.target.checked)}
+              />
+            }
+            label="Bild einschließen"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPrintDialogOpen(false)}>Abbrechen</Button>
+          <Button
+            variant="contained"
+            startIcon={printing ? <CircularProgress size={16} color="inherit" /> : <PrintIcon />}
+            disabled={printing}
+            onClick={() => handleGeneratePdf(includeImage)}
+          >
+            {printing ? 'Erstelle PDF…' : 'PDF erstellen'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
