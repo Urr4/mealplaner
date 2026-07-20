@@ -17,12 +17,15 @@ export interface RecipeStep {
   instruction: string;
 }
 
+export type RecipeCategory = 'main' | 'other';
+
 export interface Recipe {
   id: string;
   name: string;
   description: string;
   imageUrl: string | null;
   imageId: string | null;
+  category: RecipeCategory;
   ingredients: RecipeIngredient[];
   steps: RecipeStep[];
   likedBy: Person[];
@@ -43,6 +46,7 @@ export interface RecipeSummary {
 export interface RecipeRequest {
   name: string;
   description: string;
+  category: RecipeCategory;
   ingredients: { name: string; quantity: string; unit: string }[];
   steps: string[];
   likedBy: string[];

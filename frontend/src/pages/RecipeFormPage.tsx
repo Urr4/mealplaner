@@ -3,7 +3,8 @@ import {
   Box, Container, Typography, TextField, Button, IconButton,
   Alert, CircularProgress, Paper, Divider, Chip, Avatar,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Tooltip, Stack, Autocomplete, Tabs, Tab
+  Tooltip, Stack, Autocomplete, Tabs, Tab,
+  FormControl, FormLabel, RadioGroup, FormControlLabel, Radio
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -22,7 +23,7 @@ import MicOffIcon from '@mui/icons-material/MicOff';
 import StopIcon from '@mui/icons-material/Stop';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import { useNavigate, useParams } from 'react-router-dom';
-import type { RecipeIngredient, RecipeStep, Person, ParsedRecipe } from '../types';
+import type { RecipeIngredient, RecipeStep, Person, ParsedRecipe, RecipeCategory } from '../types';
 import {
   getRecipe, createRecipe, updateRecipe, uploadImage,
   parseRecipeFromImage, parseRecipeFromText, parseRecipeFromUrl,
@@ -48,6 +49,7 @@ export default function RecipeFormPage() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [category, setCategory] = useState<RecipeCategory>('main');
   const [ingredients, setIngredients] = useState<IngredientRow[]>([
     { _key: nextKey(), name: '', quantity: '', unit: '' }
   ]);
@@ -108,6 +110,7 @@ export default function RecipeFormPage() {
     getRecipe(id).then(recipe => {
       setName(recipe.name);
       setDescription(recipe.description);
+      setCategory(recipe.category || 'main');
       setIngredients(
         recipe.ingredients.length
           ? recipe.ingredients.map(i => ({ ...i, _key: nextKey() }))
@@ -246,6 +249,7 @@ export default function RecipeFormPage() {
       const body = {
         name: name.trim(),
         description: description.trim(),
+        category,
         ingredients: ingredients.filter(i => i.name.trim()),
         steps: steps.filter(s => s.instruction.trim()).map(s => s.instruction),
         likedBy, dislikedBy,
@@ -426,6 +430,17 @@ export default function RecipeFormPage() {
             <TextField label="Rezeptname *" fullWidth value={name} onChange={e => setName(e.target.value)} />
             <TextField label="Kurzbeschreibung" fullWidth multiline rows={2} value={description}
               onChange={e => setDescription(e.target.value)} placeholder="Ein kurzer Satz über das Rezept…" />
+            <FormControl>
+              <FormLabel sx={{ fontSize: 14 }}>Kategorie</FormLabel>
+              <RadioGroup
+                row
+                value={category}
+                onChange={e => setCategory(e.target.value as RecipeCategory)}
+              >
+                <FormControlLabel value="main" control={<Radio />} label="Hauptmahlzeit" />
+                <FormControlLabel value="other" control={<Radio />} label="Sonstiges" />
+              </RadioGroup>
+            </FormControl>
           </Stack>
         </Paper>
 
