@@ -12,13 +12,19 @@ interface Props {
   recipe: Recipe;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onView: (id: string) => void;
   compact?: boolean;
 }
 
-export default function RecipeCard({ recipe, onEdit, onDelete, compact = false }: Props) {
+export default function RecipeCard({ recipe, onEdit, onDelete, onView, compact = false }: Props) {
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
+
   if (compact) {
     return (
-      <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Card
+        sx={{ display: 'flex', flexDirection: 'column', height: '100%', cursor: 'pointer' }}
+        onClick={() => onView(recipe.id)}
+      >
         {recipe.imageUrl ? (
           <CardMedia component="img" image={recipe.imageUrl} alt={recipe.name}
             sx={{ aspectRatio: '1/1', objectFit: 'cover', width: '100%' }} />
@@ -41,10 +47,10 @@ export default function RecipeCard({ recipe, onEdit, onDelete, compact = false }
           </Typography>
         </CardContent>
         <CardActions sx={{ justifyContent: 'flex-end', p: 0.5, pt: 0 }}>
-          <IconButton size="small" color="primary" onClick={() => onEdit(recipe.id)}>
+          <IconButton size="small" color="primary" onClick={e => { stop(e); onEdit(recipe.id); }}>
             <EditIcon sx={{ fontSize: 16 }} />
           </IconButton>
-          <IconButton size="small" color="error" onClick={() => onDelete(recipe.id)}>
+          <IconButton size="small" color="error" onClick={e => { stop(e); onDelete(recipe.id); }}>
             <DeleteIcon sx={{ fontSize: 16 }} />
           </IconButton>
         </CardActions>
@@ -53,7 +59,7 @@ export default function RecipeCard({ recipe, onEdit, onDelete, compact = false }
   }
 
   return (
-    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', cursor: 'pointer' }} onClick={() => onView(recipe.id)}>
       {recipe.imageUrl ? (
         <CardMedia component="img" image={recipe.imageUrl} alt={recipe.name}
           sx={{ aspectRatio: '4/3', objectFit: 'cover' }} />
@@ -91,12 +97,12 @@ export default function RecipeCard({ recipe, onEdit, onDelete, compact = false }
 
       <CardActions sx={{ justifyContent: 'flex-end', pt: 0 }}>
         <Tooltip title="Bearbeiten">
-          <IconButton size="small" color="primary" onClick={() => onEdit(recipe.id)}>
+          <IconButton size="small" color="primary" onClick={e => { stop(e); onEdit(recipe.id); }}>
             <EditIcon fontSize="small" />
           </IconButton>
         </Tooltip>
         <Tooltip title="Löschen">
-          <IconButton size="small" color="error" onClick={() => onDelete(recipe.id)}>
+          <IconButton size="small" color="error" onClick={e => { stop(e); onDelete(recipe.id); }}>
             <DeleteIcon fontSize="small" />
           </IconButton>
         </Tooltip>

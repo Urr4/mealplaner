@@ -117,6 +117,7 @@ export default function RecipeListPage() {
                 <Grid key={recipe.id} size={{ xs: 6, sm: 6, md: 4 }}>
                   <RecipeCard
                     recipe={recipe}
+                    onView={id => navigate(`/recipes/${id}`)}
                     onEdit={id => navigate(`/recipes/${id}/edit`)}
                     onDelete={handleDelete}
                     compact={isMobile}

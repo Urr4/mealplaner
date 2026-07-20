@@ -3,7 +3,7 @@ import {
   Box, Container, Typography, TextField, Button, IconButton,
   Alert, CircularProgress, Paper, Divider, Chip, Avatar,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Tooltip, Stack, Autocomplete
+  Tooltip, Stack, Autocomplete, Tabs, Tab
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -12,6 +12,7 @@ import MicIcon from '@mui/icons-material/Mic';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import LinkIcon from '@mui/icons-material/Link';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
@@ -33,6 +34,8 @@ interface StepRow extends RecipeStep { _key: string }
 
 let _keyCounter = 0;
 const nextKey = () => String(++_keyCounter);
+
+type SourceTab = 'image' | 'url' | 'dictation';
 
 export default function RecipeFormPage() {
   const navigate = useNavigate();
@@ -57,9 +60,9 @@ export default function RecipeFormPage() {
   const [personDialogOpen, setPersonDialogOpen] = useState(false);
   const [ollamaStatus, setOllamaStatus] = useState<{ available: boolean; downloading: boolean; modelsReady: boolean; error?: string | null } | null>(null);
   const [dictationText, setDictationText] = useState('');
-  const [dictationDialogOpen, setDictationDialogOpen] = useState(false);
+  const [sourceDialogOpen, setSourceDialogOpen] = useState(false);
+  const [sourceTab, setSourceTab] = useState<SourceTab>('image');
   const [recipeUrl, setRecipeUrl] = useState('');
-  const [urlDialogOpen, setUrlDialogOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [interimText, setInterimText] = useState('');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -187,18 +190,21 @@ export default function RecipeFormPage() {
     setInterimText('');
   };
 
-  const closeDictationDialog = () => {
+  const closeSourceDialog = () => {
     stopRecording();
-    setDictationDialogOpen(false);
+    setSourceDialogOpen(false);
+    setSourceTab('image');
     setDictationText('');
     finalTextRef.current = '';
     setInterimText('');
+    setRecipeUrl('');
   };
 
   const handleParseImage = async (file: File) => {
     setParsing(true); setError(null);
     try {
       applyParsed(await parseRecipeFromImage(file));
+      setSourceDialogOpen(false);
     } catch (err: unknown) {
       setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Fehler beim Analysieren des Bildes');
     } finally { setParsing(false); }
@@ -211,17 +217,12 @@ export default function RecipeFormPage() {
     setParsing(true); setError(null);
     try {
       applyParsed(await parseRecipeFromText(text));
-      setDictationDialogOpen(false);
+      setSourceDialogOpen(false);
       setDictationText('');
       finalTextRef.current = '';
     } catch (err: unknown) {
       setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Fehler beim Verarbeiten des Textes');
     } finally { setParsing(false); }
-  };
-
-  const closeUrlDialog = () => {
-    setUrlDialogOpen(false);
-    setRecipeUrl('');
   };
 
   const handleParseUrl = async () => {
@@ -230,7 +231,7 @@ export default function RecipeFormPage() {
     setParsing(true); setError(null);
     try {
       applyParsed(await parseRecipeFromUrl(url));
-      closeUrlDialog();
+      closeSourceDialog();
     } catch (err: unknown) {
       setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Fehler beim Auslesen des Rezepts');
     } finally { setParsing(false); }
@@ -337,31 +338,7 @@ export default function RecipeFormPage() {
                         bgcolor: 'rgba(255,255,255,0.15)', color: 'white', borderColor: 'rgba(255,255,255,0.5)',
                         '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)', borderColor: 'rgba(255,255,255,0.15)' },
                       }}>
-                      Rezept diktieren
-                    </Button>
-                  </span>
-                </Tooltip>
-                <Tooltip title="Nicht verfügbar, nötige Systeme werden installiert">
-                  <span>
-                    <Button variant="outlined" startIcon={<AddPhotoAlternateIcon />}
-                      disabled
-                      sx={{
-                        bgcolor: 'rgba(255,255,255,0.15)', color: 'white', borderColor: 'rgba(255,255,255,0.5)',
-                        '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)', borderColor: 'rgba(255,255,255,0.15)' },
-                      }}>
-                      Rezept von Bild
-                    </Button>
-                  </span>
-                </Tooltip>
-                <Tooltip title="Nicht verfügbar, nötige Systeme werden installiert">
-                  <span>
-                    <Button variant="outlined" startIcon={<LinkIcon />}
-                      disabled
-                      sx={{
-                        bgcolor: 'rgba(255,255,255,0.15)', color: 'white', borderColor: 'rgba(255,255,255,0.5)',
-                        '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)', borderColor: 'rgba(255,255,255,0.15)' },
-                      }}>
-                      Rezept von Link
+                      Rezept von Quelle
                     </Button>
                   </span>
                 </Tooltip>
@@ -375,47 +352,15 @@ export default function RecipeFormPage() {
                   <span>
                     <Button
                       variant="outlined"
-                      startIcon={<MicIcon />}
+                      startIcon={<AutoAwesomeIcon />}
                       disabled={!ollamaStatus?.modelsReady || parsing}
-                      onClick={() => setDictationDialogOpen(true)}
+                      onClick={() => setSourceDialogOpen(true)}
                       sx={{
                         bgcolor: 'rgba(255,255,255,0.15)', color: 'white', borderColor: 'rgba(255,255,255,0.5)',
                         '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)', borderColor: 'rgba(255,255,255,0.15)' },
                       }}
                     >
-                      Rezept diktieren
-                    </Button>
-                  </span>
-                </Tooltip>
-                <Tooltip title={ollamaUnavailableReason}>
-                  <span>
-                    <Button
-                      variant="outlined"
-                      startIcon={<AddPhotoAlternateIcon />}
-                      disabled={!ollamaStatus?.modelsReady || parsing}
-                      onClick={() => parseImageInputRef.current?.click()}
-                      sx={{
-                        bgcolor: 'rgba(255,255,255,0.15)', color: 'white', borderColor: 'rgba(255,255,255,0.5)',
-                        '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)', borderColor: 'rgba(255,255,255,0.15)' },
-                      }}
-                    >
-                      Rezept von Bild
-                    </Button>
-                  </span>
-                </Tooltip>
-                <Tooltip title={ollamaUnavailableReason}>
-                  <span>
-                    <Button
-                      variant="outlined"
-                      startIcon={<LinkIcon />}
-                      disabled={!ollamaStatus?.modelsReady || parsing}
-                      onClick={() => setUrlDialogOpen(true)}
-                      sx={{
-                        bgcolor: 'rgba(255,255,255,0.15)', color: 'white', borderColor: 'rgba(255,255,255,0.5)',
-                        '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)', borderColor: 'rgba(255,255,255,0.15)' },
-                      }}
-                    >
-                      Rezept von Link
+                      Rezept von Quelle
                     </Button>
                   </span>
                 </Tooltip>
@@ -486,7 +431,7 @@ export default function RecipeFormPage() {
                         updateIngredient(ing._key, 'quantity', e.target.value);
                     }}
                     inputProps={{ inputMode: 'decimal' }}
-                    sx={{ width: 90 }} size="small" />
+                    sx={{ width: { xs: 100, sm: 90 }, flexShrink: 0 }} size="small" />
                   <Tooltip title={unitMismatch ? `Andere Rezepte verwenden „${canonical}" für diese Zutat → Einkaufsliste kann nicht zusammengefasst werden` : ''}>
                     <Autocomplete freeSolo options={UNITS} value={ing.unit}
                       onInputChange={(_, val) => updateIngredient(ing._key, 'unit', val)}
@@ -496,7 +441,7 @@ export default function RecipeFormPage() {
                           focused={unitMismatch || undefined}
                         />
                       )}
-                      sx={{ width: 110 }} />
+                      sx={{ width: { xs: 76, sm: 110 }, flexShrink: 0 }} />
                   </Tooltip>
                   <TextField label="Zutat *" value={ing.name}
                     onChange={e => updateIngredient(ing._key, 'name', e.target.value)}
@@ -593,136 +538,175 @@ export default function RecipeFormPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Diktat Dialog */}
-      <Dialog open={dictationDialogOpen} onClose={closeDictationDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Rezept diktieren</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Drücke auf das Mikrofon und erkläre das Rezept auf Deutsch — die KI strukturiert es für dich.
-          </Typography>
+      {/* Rezept-von-Quelle Dialog */}
+      <Dialog open={sourceDialogOpen} onClose={closeSourceDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Rezept von Quelle</DialogTitle>
+        <Tabs
+          value={sourceTab}
+          onChange={(_, val: SourceTab) => setSourceTab(val)}
+          variant="fullWidth"
+          sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}
+        >
+          <Tab value="image" label="Von Bild" icon={<AddPhotoAlternateIcon />} iconPosition="start" />
+          <Tab value="url" label="Von Link" icon={<LinkIcon />} iconPosition="start" />
+          <Tab value="dictation" label="Diktieren" icon={<MicIcon />} iconPosition="start" />
+        </Tabs>
 
-          {/* Mic button */}
-          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
-            {!speechSupported ? (
-              <Typography variant="body2" color="error">
-                Spracherkennung wird in diesem Browser nicht unterstützt (Chrome/Edge empfohlen).
+        {sourceTab === 'image' && (
+          <>
+            <DialogContent>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Lade ein Foto eines Rezepts hoch — die KI liest den Inhalt aus und erstellt daraus ein Rezept.
               </Typography>
-            ) : isRecording ? (
-              <Tooltip title="Aufnahme stoppen">
-                <IconButton
-                  onClick={stopRecording}
-                  sx={{
-                    width: 72, height: 72, bgcolor: 'error.main', color: 'white',
-                    animation: 'pulse 1.2s ease-in-out infinite',
-                    '@keyframes pulse': {
-                      '0%': { boxShadow: '0 0 0 0 rgba(211,47,47,0.5)' },
-                      '70%': { boxShadow: '0 0 0 14px rgba(211,47,47,0)' },
-                      '100%': { boxShadow: '0 0 0 0 rgba(211,47,47,0)' },
-                    },
-                    '&:hover': { bgcolor: 'error.dark' },
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                <Button
+                  variant="contained"
+                  size="large"
+                  startIcon={parsing ? <CircularProgress size={16} color="inherit" /> : <AddPhotoAlternateIcon />}
+                  disabled={parsing}
+                  onClick={() => parseImageInputRef.current?.click()}
+                >
+                  {parsing ? 'Verarbeite…' : 'Bild auswählen'}
+                </Button>
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={closeSourceDialog}>Abbrechen</Button>
+            </DialogActions>
+          </>
+        )}
+
+        {sourceTab === 'url' && (
+          <>
+            <DialogContent>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Füge den Link zu einem Rezept im Internet ein — die KI liest die Seite aus und erstellt daraus ein Rezept.
+              </Typography>
+              <TextField
+                autoFocus
+                fullWidth
+                label="Rezept-URL"
+                placeholder="https://www.beispiel-rezepte.de/mein-rezept"
+                value={recipeUrl}
+                onChange={e => setRecipeUrl(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && recipeUrl.trim() && !parsing) handleParseUrl(); }}
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={closeSourceDialog}>Abbrechen</Button>
+              <Button variant="contained" onClick={handleParseUrl}
+                disabled={parsing || !recipeUrl.trim()}
+                startIcon={parsing ? <CircularProgress size={16} color="inherit" /> : <LinkIcon />}>
+                {parsing ? 'Verarbeite…' : 'Rezept erstellen'}
+              </Button>
+            </DialogActions>
+          </>
+        )}
+
+        {sourceTab === 'dictation' && (
+          <>
+            <DialogContent>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Drücke auf das Mikrofon und erkläre das Rezept auf Deutsch — die KI strukturiert es für dich.
+              </Typography>
+
+              {/* Mic button */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                {!speechSupported ? (
+                  <Typography variant="body2" color="error">
+                    Spracherkennung wird in diesem Browser nicht unterstützt (Chrome/Edge empfohlen).
+                  </Typography>
+                ) : isRecording ? (
+                  <Tooltip title="Aufnahme stoppen">
+                    <IconButton
+                      onClick={stopRecording}
+                      sx={{
+                        width: 72, height: 72, bgcolor: 'error.main', color: 'white',
+                        animation: 'pulse 1.2s ease-in-out infinite',
+                        '@keyframes pulse': {
+                          '0%': { boxShadow: '0 0 0 0 rgba(211,47,47,0.5)' },
+                          '70%': { boxShadow: '0 0 0 14px rgba(211,47,47,0)' },
+                          '100%': { boxShadow: '0 0 0 0 rgba(211,47,47,0)' },
+                        },
+                        '&:hover': { bgcolor: 'error.dark' },
+                      }}
+                    >
+                      <StopIcon sx={{ fontSize: 36 }} />
+                    </IconButton>
+                  </Tooltip>
+                ) : (
+                  <Tooltip title="Aufnahme starten">
+                    <IconButton
+                      onClick={startRecording}
+                      sx={{
+                        width: 72, height: 72, bgcolor: 'primary.main', color: 'white',
+                        '&:hover': { bgcolor: 'primary.dark' },
+                      }}
+                    >
+                      <MicIcon sx={{ fontSize: 36 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Box>
+
+              {/* Status */}
+              {isRecording && (
+                <Typography variant="caption" color="error" sx={{ display: 'block', textAlign: 'center', mb: 1 }}>
+                  🔴 Aufnahme läuft… sprich jetzt
+                </Typography>
+              )}
+
+              {/* Transcript */}
+              <Box sx={{ position: 'relative' }}>
+                <TextField
+                  multiline
+                  rows={5}
+                  fullWidth
+                  placeholder="Hier erscheint dein diktierter Text…"
+                  value={dictationText + (interimText ? interimText : '')}
+                  onChange={e => {
+                    setDictationText(e.target.value);
+                    finalTextRef.current = e.target.value;
                   }}
-                >
-                  <StopIcon sx={{ fontSize: 36 }} />
-                </IconButton>
-              </Tooltip>
-            ) : (
-              <Tooltip title="Aufnahme starten">
-                <IconButton
-                  onClick={startRecording}
-                  sx={{
-                    width: 72, height: 72, bgcolor: 'primary.main', color: 'white',
-                    '&:hover': { bgcolor: 'primary.dark' },
-                  }}
-                >
-                  <MicIcon sx={{ fontSize: 36 }} />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Box>
+                  slotProps={{ input: { readOnly: isRecording } }}
+                  sx={{ '& textarea': { color: interimText ? 'text.secondary' : 'text.primary' } }}
+                />
+                {dictationText && (
+                  <Tooltip title="Text löschen">
+                    <IconButton
+                      size="small"
+                      onClick={() => { setDictationText(''); finalTextRef.current = ''; setInterimText(''); }}
+                      sx={{ position: 'absolute', top: 6, right: 6 }}
+                    >
+                      <DeleteSweepIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Box>
 
-          {/* Status */}
-          {isRecording && (
-            <Typography variant="caption" color="error" sx={{ display: 'block', textAlign: 'center', mb: 1 }}>
-              🔴 Aufnahme läuft… sprich jetzt
-            </Typography>
-          )}
-
-          {/* Transcript */}
-          <Box sx={{ position: 'relative' }}>
-            <TextField
-              multiline
-              rows={5}
-              fullWidth
-              placeholder="Hier erscheint dein diktierter Text…"
-              value={dictationText + (interimText ? interimText : '')}
-              onChange={e => {
-                setDictationText(e.target.value);
-                finalTextRef.current = e.target.value;
-              }}
-              slotProps={{ input: { readOnly: isRecording } }}
-              sx={{ '& textarea': { color: interimText ? 'text.secondary' : 'text.primary' } }}
-            />
-            {dictationText && (
-              <Tooltip title="Text löschen">
-                <IconButton
-                  size="small"
-                  onClick={() => { setDictationText(''); finalTextRef.current = ''; setInterimText(''); }}
-                  sx={{ position: 'absolute', top: 6, right: 6 }}
-                >
-                  <DeleteSweepIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Box>
-
-          {!speechSupported && (
-            <TextField
-              autoFocus
-              multiline
-              rows={5}
-              fullWidth
-              placeholder="Text hier eingeben…"
-              value={dictationText}
-              onChange={e => setDictationText(e.target.value)}
-              sx={{ mt: 1 }}
-            />
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeDictationDialog} startIcon={<MicOffIcon />}>Abbrechen</Button>
-          <Button variant="contained" onClick={handleParseDictation}
-            disabled={parsing || !dictationText.trim()}
-            startIcon={parsing ? <CircularProgress size={16} color="inherit" /> : <MicIcon />}>
-            {parsing ? 'Verarbeite…' : 'Rezept erstellen'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Link Dialog */}
-      <Dialog open={urlDialogOpen} onClose={closeUrlDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Rezept von Link</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Füge den Link zu einem Rezept im Internet ein — die KI liest die Seite aus und erstellt daraus ein Rezept.
-          </Typography>
-          <TextField
-            autoFocus
-            fullWidth
-            label="Rezept-URL"
-            placeholder="https://www.beispiel-rezepte.de/mein-rezept"
-            value={recipeUrl}
-            onChange={e => setRecipeUrl(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && recipeUrl.trim() && !parsing) handleParseUrl(); }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeUrlDialog}>Abbrechen</Button>
-          <Button variant="contained" onClick={handleParseUrl}
-            disabled={parsing || !recipeUrl.trim()}
-            startIcon={parsing ? <CircularProgress size={16} color="inherit" /> : <LinkIcon />}>
-            {parsing ? 'Verarbeite…' : 'Rezept erstellen'}
-          </Button>
-        </DialogActions>
+              {!speechSupported && (
+                <TextField
+                  autoFocus
+                  multiline
+                  rows={5}
+                  fullWidth
+                  placeholder="Text hier eingeben…"
+                  value={dictationText}
+                  onChange={e => setDictationText(e.target.value)}
+                  sx={{ mt: 1 }}
+                />
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={closeSourceDialog} startIcon={<MicOffIcon />}>Abbrechen</Button>
+              <Button variant="contained" onClick={handleParseDictation}
+                disabled={parsing || !dictationText.trim()}
+                startIcon={parsing ? <CircularProgress size={16} color="inherit" /> : <MicIcon />}>
+                {parsing ? 'Verarbeite…' : 'Rezept erstellen'}
+              </Button>
+            </DialogActions>
+          </>
+        )}
       </Dialog>
     </Box>
   );
