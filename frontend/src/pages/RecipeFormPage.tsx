@@ -43,6 +43,8 @@ export default function RecipeFormPage() {
   const isEdit = Boolean(id);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const parseImageInputRef = useRef<HTMLInputElement>(null);
+  const ingredientNameRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const stepInputRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -288,16 +290,52 @@ export default function RecipeFormPage() {
       }
       return updated;
     }));
-  const addIngredient = () =>
-    setIngredients(prev => [...prev, { _key: nextKey(), name: '', quantity: '', unit: '' }]);
+  const addIngredient = () => {
+    const key = nextKey();
+    setIngredients(prev => [...prev, { _key: key, name: '', quantity: '', unit: '' }]);
+    return key;
+  };
   const removeIngredient = (key: string) =>
     setIngredients(prev => prev.length > 1 ? prev.filter(i => i._key !== key) : prev);
 
+  const [draggedIngredientKey, setDraggedIngredientKey] = useState<string | null>(null);
+  const reorderIngredients = (targetKey: string) => {
+    setIngredients(prev => {
+      if (!draggedIngredientKey || draggedIngredientKey === targetKey) return prev;
+      const fromIdx = prev.findIndex(i => i._key === draggedIngredientKey);
+      const toIdx = prev.findIndex(i => i._key === targetKey);
+      if (fromIdx === -1 || toIdx === -1) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
+    setDraggedIngredientKey(null);
+  };
+
   const updateStep = (key: string, val: string) =>
     setSteps(prev => prev.map(s => s._key === key ? { ...s, instruction: val } : s));
-  const addStep = () => setSteps(prev => [...prev, { _key: nextKey(), instruction: '' }]);
+  const addStep = () => {
+    const key = nextKey();
+    setSteps(prev => [...prev, { _key: key, instruction: '' }]);
+    return key;
+  };
   const removeStep = (key: string) =>
     setSteps(prev => prev.length > 1 ? prev.filter(s => s._key !== key) : prev);
+
+  /** Pressing Shift+Enter in the last row appends a new, empty row and focuses it. */
+  const handleLastIngredientKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Enter' || !e.shiftKey) return;
+    e.preventDefault();
+    const newKey = addIngredient();
+    requestAnimationFrame(() => ingredientNameRefs.current.get(newKey)?.focus());
+  };
+  const handleLastStepKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Enter' || !e.shiftKey) return;
+    e.preventDefault();
+    const newKey = addStep();
+    requestAnimationFrame(() => stepInputRefs.current.get(newKey)?.focus());
+  };
 
   const UNITS = usedUnits;
 
@@ -419,12 +457,29 @@ export default function RecipeFormPage() {
         <Paper sx={{ p: 3, mb: 3, borderRadius: 3 }}>
           <Typography variant="h6" sx={{ mb: 2, fontFamily: '"Playfair Display", serif' }}>Zutaten</Typography>
           <Stack spacing={1.5}>
-            {ingredients.map((ing) => {
+            {ingredients.map((ing, idx) => {
               const canonical = canonicalUnits[ing.name.toLowerCase().trim()];
               const unitMismatch = canonical && ing.unit && ing.unit.toLowerCase() !== canonical.toLowerCase();
+              const isLast = idx === ingredients.length - 1;
               return (
-                <Box key={ing._key} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                  <DragIndicatorIcon sx={{ color: 'text.disabled', flexShrink: 0 }} />
+                <Box
+                  key={ing._key}
+                  sx={{
+                    display: 'flex', gap: 1, alignItems: 'center',
+                    opacity: draggedIngredientKey === ing._key ? 0.4 : 1,
+                    transition: 'opacity 0.15s ease',
+                  }}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => { e.preventDefault(); reorderIngredients(ing._key); }}
+                >
+                  <Box
+                    draggable
+                    onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; setDraggedIngredientKey(ing._key); }}
+                    onDragEnd={() => setDraggedIngredientKey(null)}
+                    sx={{ display: 'flex', flexShrink: 0, cursor: 'grab', '&:active': { cursor: 'grabbing' } }}
+                  >
+                    <DragIndicatorIcon sx={{ color: 'text.disabled' }} />
+                  </Box>
                   <TextField label="Menge" value={ing.quantity}
                     onChange={e => {
                       if (isValidQuantity(e.target.value))
@@ -445,6 +500,11 @@ export default function RecipeFormPage() {
                   </Tooltip>
                   <TextField label="Zutat *" value={ing.name}
                     onChange={e => updateIngredient(ing._key, 'name', e.target.value)}
+                    onKeyDown={isLast ? handleLastIngredientKeyDown : undefined}
+                    inputRef={node => {
+                      if (node) ingredientNameRefs.current.set(ing._key, node);
+                      else ingredientNameRefs.current.delete(ing._key);
+                    }}
                     size="small" sx={{ flexGrow: 1 }} />
                   <IconButton size="small" onClick={() => removeIngredient(ing._key)} color="error">
                     <DeleteIcon />
@@ -468,7 +528,13 @@ export default function RecipeFormPage() {
                   {idx + 1}
                 </Avatar>
                 <TextField multiline minRows={2} fullWidth placeholder={`Schritt ${idx + 1}…`}
-                  value={step.instruction} onChange={e => updateStep(step._key, e.target.value)} size="small" />
+                  value={step.instruction} onChange={e => updateStep(step._key, e.target.value)}
+                  onKeyDown={idx === steps.length - 1 ? handleLastStepKeyDown : undefined}
+                  inputRef={node => {
+                    if (node) stepInputRefs.current.set(step._key, node);
+                    else stepInputRefs.current.delete(step._key);
+                  }}
+                  size="small" />
                 <IconButton size="small" onClick={() => removeStep(step._key)} color="error" sx={{ mt: 0.5 }}>
                   <DeleteIcon />
                 </IconButton>
