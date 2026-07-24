@@ -116,6 +116,48 @@ async function ensureModels() {
   }
 }
 
+// Common German cooking units, used to split a combined "500g" style value
+// into a separate quantity ("500") and unit ("g") when the model returns
+// them merged into the quantity field instead of the unit field.
+const KNOWN_UNITS = [
+  'kg', 'g', 'mg', 'l', 'ml', 'cl',
+  'el', 'tl', 'msg', 'prise', 'prisen',
+  'stück', 'stk', 'stange', 'stangen', 'scheibe', 'scheiben',
+  'zehe', 'zehen', 'bund', 'bündel', 'dose', 'dosen', 'glas', 'gläser',
+  'packung', 'packungen', 'päckchen', 'pck', 'würfel', 'blatt', 'blätter',
+  'zweig', 'zweige',
+];
+
+/**
+ * Splits a quantity string like "500g" or "1,5 kg" into { quantity, unit }.
+ * Returns null if no number+unit split could be detected.
+ */
+function splitQuantityUnit(raw) {
+  if (typeof raw !== 'string') return null;
+  const match = raw.trim().match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-ZäöüÄÖÜß]+)$/);
+  if (!match) return null;
+  const [, quantity, unit] = match;
+  if (!KNOWN_UNITS.includes(unit.toLowerCase())) return null;
+  return { quantity, unit };
+}
+
+/**
+ * Ensures each ingredient has quantity/unit properly separated. Some models
+ * merge them into the quantity field (e.g. quantity: "500g", unit: "")
+ * instead of following the requested format — this repairs that case.
+ */
+function normalizeIngredients(ingredients) {
+  if (!Array.isArray(ingredients)) return ingredients;
+  return ingredients.map(ing => {
+    if (!ing || typeof ing !== 'object') return ing;
+    if (!ing.unit && ing.quantity) {
+      const split = splitQuantityUnit(String(ing.quantity));
+      if (split) return { ...ing, quantity: split.quantity, unit: split.unit };
+    }
+    return ing;
+  });
+}
+
 async function parseRecipeFromImage(base64Image, mimeType) {
   const { default: fetch } = await import('node-fetch');
   const prompt = `Du bist ein Koch-Assistent. Analysiere das Bild und extrahiere das Rezept.
@@ -125,7 +167,8 @@ Antworte NUR mit einem gültigen JSON-Objekt in folgendem Format, ohne zusätzli
   "description": "Kurze Beschreibung (1-2 Sätze)",
   "ingredients": [{"name": "Zutat", "quantity": "Menge", "unit": "Einheit"}],
   "steps": ["Schritt 1", "Schritt 2"]
-}`;
+}
+Wichtig für "ingredients": "quantity" enthält NUR die Zahl (z.B. "500"), "unit" enthält NUR die Einheit (z.B. "g"). Trenne Zahl und Einheit immer, schreibe niemals beides zusammen in "quantity" (z.B. NICHT "500g"). Beispiel: {"name": "Mehl", "quantity": "500", "unit": "g"}.`;
 
   const res = await fetch(`${OLLAMA_BASE()}/api/generate`, {
     method: 'POST',
@@ -144,7 +187,9 @@ Antworte NUR mit einem gültigen JSON-Objekt in folgendem Format, ohne zusätzli
 
   const jsonMatch = data.response.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('Kein gültiges JSON in der Antwort');
-  return JSON.parse(jsonMatch[0]);
+  const parsed = JSON.parse(jsonMatch[0]);
+  parsed.ingredients = normalizeIngredients(parsed.ingredients);
+  return parsed;
 }
 
 async function parseRecipeFromText(dictatedText) {
@@ -157,6 +202,7 @@ Antworte NUR mit einem gültigen JSON-Objekt in folgendem Format, ohne zusätzli
   "ingredients": [{"name": "Zutat", "quantity": "Menge", "unit": "Einheit"}],
   "steps": ["Schritt 1", "Schritt 2"]
 }
+Wichtig für "ingredients": "quantity" enthält NUR die Zahl (z.B. "500"), "unit" enthält NUR die Einheit (z.B. "g"). Trenne Zahl und Einheit immer, schreibe niemals beides zusammen in "quantity" (z.B. NICHT "500g"). Beispiel: {"name": "Mehl", "quantity": "500", "unit": "g"}.
 
 Diktierter Text: ${dictatedText}`;
 
@@ -176,7 +222,9 @@ Diktierter Text: ${dictatedText}`;
 
   const jsonMatch = data.response.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('Kein gültiges JSON in der Antwort');
-  return JSON.parse(jsonMatch[0]);
+  const parsed = JSON.parse(jsonMatch[0]);
+  parsed.ingredients = normalizeIngredients(parsed.ingredients);
+  return parsed;
 }
 
 async function parseRecipeFromWebpage(plainText) {
@@ -189,6 +237,7 @@ Falls du darin ein echtes Rezept (mit Zutaten UND Zubereitungsschritten) erkenne
   "ingredients": [{"name": "Zutat", "quantity": "Menge", "unit": "Einheit"}],
   "steps": ["Schritt 1", "Schritt 2"]
 }
+Wichtig für "ingredients": "quantity" enthält NUR die Zahl (z.B. "500"), "unit" enthält NUR die Einheit (z.B. "g"). Trenne Zahl und Einheit immer, schreibe niemals beides zusammen in "quantity" (z.B. NICHT "500g"). Beispiel: {"name": "Mehl", "quantity": "500", "unit": "g"}.
 
 Falls du KEIN Rezept (oder keine Zutaten/Zubereitungsschritte) im Text erkennen kannst, antworte NUR mit folgendem JSON-Objekt, ohne zusätzlichen Text:
 {"error": "<kurzer, verständlicher Grund auf Deutsch, warum kein Rezept erkannt werden konnte>"}
@@ -214,6 +263,7 @@ ${plainText}`;
   if (!jsonMatch) throw new Error('Kein gültiges JSON in der Antwort');
   const parsed = JSON.parse(jsonMatch[0]);
   if (parsed.error) throw new Error(parsed.error);
+  parsed.ingredients = normalizeIngredients(parsed.ingredients);
   return parsed;
 }
 
