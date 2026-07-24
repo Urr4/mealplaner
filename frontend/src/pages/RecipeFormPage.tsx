@@ -25,7 +25,7 @@ import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { RecipeIngredient, RecipeStep, Person, ParsedRecipe, RecipeCategory } from '../types';
 import {
-  getRecipe, createRecipe, updateRecipe, uploadImage,
+  getRecipe, createRecipe, updateRecipe, uploadImage, removeImage,
   parseRecipeFromImage, parseRecipeFromText, parseRecipeFromUrl,
   getOllamaStatus, getPersons, createPerson, getCanonicalUnits, getUsedUnits,
 } from '../api/client';
@@ -263,6 +263,26 @@ export default function RecipeFormPage() {
     } finally { setSaving(false); }
   };
 
+  const handleRemoveImage = async () => {
+    // If there's an unsaved new file selected, just discard that selection
+    // and fall back to the previously persisted image (if any).
+    if (imageFile) {
+      setImageFile(null);
+      setImagePreview(null);
+      return;
+    }
+    if (isEdit && id && existingImageUrl) {
+      setError(null);
+      try {
+        await removeImage(id);
+      } catch (err: unknown) {
+        setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Fehler beim Entfernen des Bildes');
+        return;
+      }
+    }
+    setExistingImageUrl(null);
+  };
+
   const handleAddPerson = async () => {
     if (!newPersonName.trim()) return;
     try {
@@ -449,12 +469,23 @@ export default function RecipeFormPage() {
           <Typography variant="h6" sx={{ mb: 2, fontFamily: '"Playfair Display", serif' }}>Bild</Typography>
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexWrap: 'wrap' }}>
             {(imagePreview || existingImageUrl) && (
-              <Box component="img" src={imagePreview || existingImageUrl || ''}
-                sx={{ width: 160, height: 120, objectFit: 'cover', borderRadius: 2 }} />
+              <Box sx={{ position: 'relative' }}>
+                <Box component="img" src={imagePreview || existingImageUrl || ''}
+                  sx={{ width: 160, height: 120, objectFit: 'cover', borderRadius: 2 }} />
+                <IconButton size="small" onClick={handleRemoveImage}
+                  aria-label="Bild entfernen"
+                  sx={{
+                    position: 'absolute', top: -8, right: -8,
+                    bgcolor: 'background.paper', boxShadow: 1,
+                    '&:hover': { bgcolor: 'error.light', color: 'white' },
+                  }}>
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
             )}
             <Box>
               <Button variant="outlined" startIcon={<CloudUploadIcon />} onClick={() => imageInputRef.current?.click()}>
-                Bild hochladen
+                {(imagePreview || existingImageUrl) ? 'Bild ändern' : 'Bild hochladen'}
               </Button>
               <input ref={imageInputRef} type="file" accept="image/*" style={{ display: 'none' }}
                 onChange={e => {
