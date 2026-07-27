@@ -13,7 +13,7 @@ function getSetting(key, fallback) {
 }
 
 const OLLAMA_BASE = () => getSetting('ollama_url', process.env.OLLAMA_URL || 'http://localhost:11434');
-const VISION_MODEL = () => getSetting('ollama_vision_model', process.env.OLLAMA_VISION_MODEL || 'llava:7b');
+const VISION_MODEL = () => getSetting('ollama_vision_model', process.env.OLLAMA_VISION_MODEL || 'qwen2.5vl:7b');
 const TEXT_MODEL = () => getSetting('ollama_text_model', process.env.OLLAMA_TEXT_MODEL || 'llama3.2:3b');
 
 // ── Model status tracking ─────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ async function ensureModels() {
   const needed = [...new Set([VISION_MODEL(), TEXT_MODEL()])];
   const installed = await getInstalledModels();
 
-  // Match by name prefix (e.g. "llava" covers "llava:7b" and "llava:latest")
+  // Match by name prefix (e.g. "qwen2.5vl" covers "qwen2.5vl:7b" and "qwen2.5vl:latest")
   const missing = needed.filter(model => {
     const tag = model.includes(':') ? model : `${model}:latest`;
     return !installed.some(i => i === tag || i === model || i.startsWith(model.split(':')[0] + ':'));
