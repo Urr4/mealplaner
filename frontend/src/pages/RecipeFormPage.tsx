@@ -215,6 +215,21 @@ export default function RecipeFormPage() {
     } finally { setParsing(false); }
   };
 
+  // Allow pasting a screenshot from the clipboard while the "Von Bild" tab is active.
+  useEffect(() => {
+    if (!sourceDialogOpen || sourceTab !== 'image') return;
+    const onPaste = (e: ClipboardEvent) => {
+      const item = Array.from(e.clipboardData?.items || []).find(i => i.type.startsWith('image/'));
+      const file = item?.getAsFile();
+      if (file) {
+        e.preventDefault();
+        handleParseImage(file);
+      }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [sourceDialogOpen, sourceTab]);
+
   const handleParseDictation = async () => {
     stopRecording();
     const text = dictationText.trim();
@@ -669,6 +684,7 @@ export default function RecipeFormPage() {
             <DialogContent>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 Lade ein Foto eines Rezepts hoch — die KI liest den Inhalt aus und erstellt daraus ein Rezept.
+                Du kannst auch einen Screenshot in die Zwischenablage kopieren und hier mit Strg+V (Cmd+V) einfügen.
               </Typography>
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
                 <Button
@@ -681,6 +697,9 @@ export default function RecipeFormPage() {
                   {parsing ? 'Verarbeite…' : 'Bild auswählen'}
                 </Button>
               </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center' }}>
+                oder Bild einfügen mit Strg+V / Cmd+V
+              </Typography>
             </DialogContent>
             <DialogActions>
               <Button onClick={closeSourceDialog}>Abbrechen</Button>
