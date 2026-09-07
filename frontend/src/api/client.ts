@@ -1,6 +1,6 @@
 import axios from 'axios';
 import type {
-  Recipe, RecipeSummary, RecipeRequest, ParsedRecipe,
+  Recipe, RecipeSummary, RecipeRequest, ParsedRecipe, RecipeCategory,
   Person, MealPlanEntry, MealPlanConstraint,
   ShoppingList, Settings
 } from '../types';
@@ -8,8 +8,8 @@ import type {
 const api = axios.create({ baseURL: '/api' });
 
 // ── Rezepte ───────────────────────────────────────────────────────────────────
-export const getRecipes = (name?: string, ingredient?: string) =>
-  api.get<Recipe[]>('/recipes', { params: { name, ingredient } }).then(r => r.data);
+export const getRecipes = (name?: string, ingredient?: string, options?: { category?: RecipeCategory; composed?: boolean }) =>
+  api.get<Recipe[]>('/recipes', { params: { name, ingredient, category: options?.category, composed: options?.composed } }).then(r => r.data);
 
 export const getRecipe = (id: string) =>
   api.get<Recipe>(`/recipes/${id}`).then(r => r.data);
@@ -22,6 +22,9 @@ export const updateRecipe = (id: string, req: RecipeRequest) =>
 
 export const deleteRecipe = (id: string) =>
   api.delete(`/recipes/${id}`);
+
+export const createComposedRecipe = (name: string, componentRecipeIds: string[]) =>
+  api.post<Recipe>('/recipes/composed', { name, componentRecipeIds }).then(r => r.data);
 
 export const uploadImage = (id: string, file: File) => {
   const form = new FormData();

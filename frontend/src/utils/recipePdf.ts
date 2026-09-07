@@ -35,10 +35,9 @@ export interface RecipePdfOptions {
   includeImage?: boolean;
 }
 
-/** Builds a printable, black & white A4 recipe card PDF and returns it as an object URL. */
-export async function buildRecipePdf(recipe: Recipe, options: RecipePdfOptions = {}): Promise<string> {
+/** Draws a single printable recipe card into an existing jsPDF document, starting at the top of the current page. */
+async function addRecipeToDoc(doc: jsPDF, recipe: Recipe, options: RecipePdfOptions = {}): Promise<void> {
   const { includeImage = true } = options;
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   let y = MARGIN;
 
   // Image (if available and requested) — scaled to fit while keeping its aspect ratio
@@ -130,6 +129,28 @@ export async function buildRecipePdf(recipe: Recipe, options: RecipePdfOptions =
       y += lines.length * 5.5 + 2;
     });
   }
+}
 
+/** Builds a printable, color A4 recipe card PDF and returns it as an object URL. */
+export async function buildRecipePdf(recipe: Recipe, options: RecipePdfOptions = {}): Promise<string> {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  await addRecipeToDoc(doc, recipe, options);
   return doc.output('bloburl').toString();
+}
+
+/**
+ * Builds one combined, printer-friendly A4 PDF containing every given recipe,
+ * each starting on its own page, and triggers a browser download.
+ */
+export async function buildRecipesPdf(
+  recipes: Recipe[],
+  options: RecipePdfOptions = {},
+  filename = 'rezepte.pdf',
+): Promise<void> {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  for (let i = 0; i < recipes.length; i++) {
+    if (i > 0) doc.addPage();
+    await addRecipeToDoc(doc, recipes[i], options);
+  }
+  doc.save(filename);
 }

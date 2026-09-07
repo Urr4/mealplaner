@@ -32,6 +32,7 @@ function migrate() {
       description TEXT NOT NULL DEFAULT '',
       image_id    TEXT,
       category    TEXT NOT NULL DEFAULT 'main' CHECK(category IN ('main', 'other')),
+      is_composed INTEGER NOT NULL DEFAULT 0,
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -63,6 +64,13 @@ function migrate() {
       recipe_id TEXT,
       no_match  INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS recipe_components (
+      id                  TEXT PRIMARY KEY,
+      composed_recipe_id  TEXT NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+      component_recipe_id TEXT NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+      sort_order          INTEGER NOT NULL DEFAULT 0
+    );
   `);
 
   // Backfill `category` for databases created before this column existed.
@@ -70,6 +78,12 @@ function migrate() {
   const hasCategory = columns.length > 0 && columns[0].values.some(row => row[1] === 'category');
   if (!hasCategory) {
     _db.exec(`ALTER TABLE recipes ADD COLUMN category TEXT NOT NULL DEFAULT 'main' CHECK(category IN ('main', 'other'))`);
+  }
+
+  // Backfill `is_composed` for databases created before this column existed.
+  const hasIsComposed = columns.length > 0 && columns[0].values.some(row => row[1] === 'is_composed');
+  if (!hasIsComposed) {
+    _db.exec(`ALTER TABLE recipes ADD COLUMN is_composed INTEGER NOT NULL DEFAULT 0`);
   }
 }
 

@@ -7,6 +7,7 @@ import NavBar from './components/NavBar';
 import RecipeListPage from './pages/RecipeListPage';
 import RecipeFormPage from './pages/RecipeFormPage';
 import RecipeViewPage from './pages/RecipeViewPage';
+import ComposedRecipesPage from './pages/ComposedRecipesPage';
 import MealPlanPage from './pages/MealPlanPage';
 import SettingsPage from './pages/SettingsPage';
 
@@ -46,6 +47,7 @@ function AppContent() {
         <Route path="/" element={<Navigate to="/mealplan" replace />} />
         <Route path="/mealplan" element={<MealPlanPage />} />
         <Route path="/recipes" element={<RecipeListPage />} />
+        <Route path="/recipes/composed" element={<ComposedRecipesPage />} />
         <Route path="/recipes/new" element={<RecipeFormPage />} />
         <Route path="/recipes/:id" element={<RecipeViewPage />} />
         <Route path="/recipes/:id/edit" element={<RecipeFormPage />} />

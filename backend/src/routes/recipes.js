@@ -34,6 +34,16 @@ async function enrichRecipe(recipe) {
     try { imageUrl = await getImageUrl(recipe.image_id); } catch { /* MinIO nicht verfügbar */ }
   }
 
+  let components;
+  if (recipe.is_composed) {
+    components = query(
+      `SELECT r.id, r.name FROM recipe_components rc
+       JOIN recipes r ON r.id = rc.component_recipe_id
+       WHERE rc.composed_recipe_id = ? ORDER BY rc.sort_order`,
+      [recipe.id]
+    ).rows;
+  }
+
   return {
     id: recipe.id,
     name: recipe.name,
@@ -41,6 +51,8 @@ async function enrichRecipe(recipe) {
     imageUrl,
     imageId: recipe.image_id,
     category: recipe.category || 'main',
+    isComposed: !!recipe.is_composed,
+    components,
     ingredients,
     steps,
     likedBy: persons.filter(p => p.preference === 'liked').map(p => ({ id: p.id, name: p.name })),
@@ -85,9 +97,14 @@ const normalizeCategory = category => (category === 'other' ? 'other' : 'main');
 // ── GET /api/recipes ──────────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
-    const { name, ingredient } = req.query;
+    const { name, ingredient, category, composed } = req.query;
+    // By default only "normal" recipes are listed — composed recipes (see
+    // POST /composed) are hidden here and only surface in their own tab.
+    const wantComposed = composed === 'true' || composed === '1';
     let sql = 'SELECT DISTINCT r.* FROM recipes r';
     const params = [];
+    const conditions = ['r.is_composed = ?'];
+    params.push(wantComposed ? 1 : 0);
 
     if (ingredient) {
       sql += ' JOIN recipe_ingredients ri ON ri.recipe_id = r.id AND ri.name LIKE ?';
@@ -95,11 +112,16 @@ router.get('/', async (req, res) => {
     }
 
     if (name) {
-      sql += params.length ? ' WHERE' : ' WHERE';
-      sql += ' r.name LIKE ?';
+      conditions.push('r.name LIKE ?');
       params.push(`%${name}%`);
     }
 
+    if (category) {
+      conditions.push('r.category = ?');
+      params.push(category);
+    }
+
+    sql += ' WHERE ' + conditions.join(' AND ');
     sql += ' ORDER BY r.created_at DESC';
     const recipes = query(sql, params).rows;
     const enriched = await Promise.all(recipes.map(enrichRecipe));
@@ -107,6 +129,83 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Fehler beim Laden der Rezepte' });
+  }
+});
+
+// ── POST /api/recipes/composed ────────────────────────────────────────────────
+// Combines several non-main recipes (e.g. "Kartoffelpüree" + "Schnitzel") into a
+// single virtual main-dish recipe. Its ingredients/steps are copied from the
+// selected components so it behaves exactly like a normal recipe everywhere
+// else (meal plan, shopping list, printing) while being hidden from the
+// regular recipe list.
+router.post('/composed', async (req, res) => {
+  try {
+    const { name, componentRecipeIds } = req.body;
+    if (!name) return res.status(400).json({ error: 'Name ist erforderlich' });
+    if (!Array.isArray(componentRecipeIds) || componentRecipeIds.length < 2) {
+      return res.status(400).json({ error: 'Mindestens zwei Rezepte auswählen' });
+    }
+
+    const components = componentRecipeIds.map(id => {
+      const rows = query('SELECT * FROM recipes WHERE id = ?', [id]).rows;
+      if (!rows.length) throw new Error(`Rezept ${id} nicht gefunden`);
+      if (rows[0].category !== 'other' || rows[0].is_composed) {
+        throw new Error(`Rezept "${rows[0].name}" ist keine gültige Zutat-Komponente (nur Sonstiges-Rezepte erlaubt)`);
+      }
+      return rows[0];
+    });
+
+    const id = uuidv4();
+    query(
+      'INSERT INTO recipes (id, name, description, category, is_composed) VALUES (?, ?, ?, ?, ?)',
+      [id, name, '', 'main', 1]
+    );
+
+    let sortOrder = 0;
+    let stepNumber = 0;
+    for (let i = 0; i < components.length; i++) {
+      const component = components[i];
+      query(
+        'INSERT INTO recipe_components (id, composed_recipe_id, component_recipe_id, sort_order) VALUES (?, ?, ?, ?)',
+        [uuidv4(), id, component.id, i]
+      );
+
+      const ingredients = query(
+        'SELECT name, quantity, unit FROM recipe_ingredients WHERE recipe_id = ? ORDER BY sort_order',
+        [component.id]
+      ).rows;
+      for (const ing of ingredients) {
+        query(
+          'INSERT INTO recipe_ingredients (id, recipe_id, name, quantity, unit, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
+          [uuidv4(), id, ing.name, ing.quantity || '', ing.unit || '', sortOrder++]
+        );
+      }
+
+      const steps = query(
+        'SELECT instruction FROM recipe_steps WHERE recipe_id = ? ORDER BY step_number',
+        [component.id]
+      ).rows;
+      if (steps.length) {
+        stepNumber++;
+        query(
+          'INSERT INTO recipe_steps (id, recipe_id, step_number, instruction) VALUES (?, ?, ?, ?)',
+          [uuidv4(), id, stepNumber, `— ${component.name} —`]
+        );
+        for (const step of steps) {
+          stepNumber++;
+          query(
+            'INSERT INTO recipe_steps (id, recipe_id, step_number, instruction) VALUES (?, ?, ?, ?)',
+            [uuidv4(), id, stepNumber, step.instruction]
+          );
+        }
+      }
+    }
+
+    const recipe = query('SELECT * FROM recipes WHERE id = ?', [id]).rows[0];
+    res.status(201).json(await enrichRecipe(recipe));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || 'Fehler beim Erstellen des zusammengesetzten Rezepts' });
   }
 });
 

@@ -26,6 +26,8 @@ export interface Recipe {
   imageUrl: string | null;
   imageId: string | null;
   category: RecipeCategory;
+  isComposed?: boolean;
+  components?: { id: string; name: string }[];
   ingredients: RecipeIngredient[];
   steps: RecipeStep[];
   likedBy: Person[];
