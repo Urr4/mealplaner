@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         '/api': { target: backendTarget, changeOrigin: true },
-        '/dev-images': { target: backendTarget, changeOrigin: true },
+        '/images': { target: backendTarget, changeOrigin: true },
       },
       open: mode === 'development',
     },

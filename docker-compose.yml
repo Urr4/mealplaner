@@ -10,18 +10,11 @@ version: "3.9"
 #
 #  2. Datenverzeichnisse auf der NAS anlegen (einmalig, auf Pi1):
 #       sudo mkdir -p /volume1/cloudstorage/docker-swarm-data/mealplaner
-#       sudo mkdir -p /volume1/cloudstorage/docker-swarm-data/minio/mealplaner
 #       sudo chmod 777 /volume1/cloudstorage/docker-swarm-data/mealplaner
-#       sudo chmod 777 /volume1/cloudstorage/docker-swarm-data/minio/mealplaner
+#     (Datenbank und Bilder liegen beide dort: mealplaner.db und images/)
 #
-#  3. Secrets-Datei anlegen (einmalig, nur auf dem Pi, nicht im Repo):
-#       mkdir -p ~/secrets && chmod 700 ~/secrets
-#       printf 'MINIO_ACCESS_KEY=mealplaner\nMINIO_SECRET_KEY=<starkes-passwort>\n' > ~/secrets/mealplaner.env
-#       chmod 600 ~/secrets/mealplaner.env
-#
-#  4. Stack deployen (nur beim ersten Mal und bei Änderungen an dieser Datei;
-#     neue App-Versionen rollt Shepherd automatisch aus):
-#       set -a; . ~/secrets/mealplaner.env; set +a
+#  3. Stack deployen (nur beim ersten Mal und bei Änderungen an dieser Datei;
+#     neue App-Versionen rollt Shepherd automatisch aus). Keine Secrets nötig:
 #       docker stack deploy --with-registry-auth -c docker-compose.yml mealplaner
 #
 #  Erreichbar unter: http://pi1:3001
@@ -35,11 +28,8 @@ services:
     environment:
       PORT: "3001"
       DB_PATH: /data/mealplaner.db
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_PUBLIC_URL: http://pi1:9002
-      MINIO_BUCKET: mealplaner
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-mealplaner}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY fehlt (siehe ~/secrets/mealplaner.env)}
+      STORAGE_TYPE: local
+      LOCAL_IMAGES_DIR: /data/images
       OLLAMA_URL: ${OLLAMA_URL:-http://Stefans-PC:11434}
       OLLAMA_VISION_MODEL: ${OLLAMA_VISION_MODEL:-qwen2.5vl:7b}
       OLLAMA_TEXT_MODEL: ${OLLAMA_TEXT_MODEL:-llama3.2:3b}
@@ -51,8 +41,6 @@ services:
       - target: 3001
         published: 3001
         mode: host
-    depends_on:
-      - minio
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001/api/recipes"]
       interval: 30s
@@ -72,34 +60,6 @@ services:
         constraints:
           - node.role == manager
 
-  # ── MinIO (Bildspeicher) ─────────────────────────────────────────────────────
-  minio:
-    image: minio/minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-mealplaner}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY fehlt (siehe ~/secrets/mealplaner.env)}
-    volumes:
-      - minio-data:/data
-    networks:
-      - internal
-    ports:
-      # Port 9002 (API) und 9003 (Konsole) — kein Konflikt mit taster (nutzt 80/8443/3000)
-      - target: 9000
-        published: 9002
-        mode: host
-      - target: 9001
-        published: 9003
-        mode: host
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-      placement:
-        constraints:
-          - node.role == manager
-
 networks:
   internal:
     driver: overlay
@@ -112,10 +72,3 @@ volumes:
       type: none
       o: bind
       device: /volume1/cloudstorage/docker-swarm-data/mealplaner
-
-  minio-data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /volume1/cloudstorage/docker-swarm-data/minio/mealplaner

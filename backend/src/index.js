@@ -9,11 +9,11 @@ const PORT = process.env.PORT || 3001;
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
-// ── Lokaler Bild-Speicher (nur im Dev-Modus) ──────────────────────────────────
+// ── Lokaler Bild-Speicher ──────────────────────────────────
 if ((process.env.STORAGE_TYPE || 'minio') === 'local') {
   const { BASE_DIR } = require('./local-storage');
-  app.use('/dev-images', express.static(BASE_DIR));
-  console.log(`[storage] Bilder lokal unter ${BASE_DIR} (→ /dev-images/…)`);
+  app.use('/images', express.static(BASE_DIR));
+  console.log(`[storage] Bilder lokal unter ${BASE_DIR} (→ /images/…)`);
 }
 
 // ── Routes ────────────────────────────────────────────────────────────────────

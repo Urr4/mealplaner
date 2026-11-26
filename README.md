@@ -9,7 +9,7 @@ LAN  ──►  Port 3001
            mealplaner-app (Node/Express)
                 │
            SQLite  (NFS — Synology NAS)
-           MinIO   (NFS — Synology NAS)  ← Rezept-Bilder
+           Bilder  (NFS — Synology NAS, /data/images)  ← Rezept-Bilder
                 │ optional
            Ollama  (http://Stefans-PC:11434)  ← Desktop-PC
 ```
@@ -49,18 +49,14 @@ Auf der Synology NAS müssen diese Ordner im Pfad `docker-swarm-data` existieren
 
 ```
 docker-swarm-data/
-  mealplaner/          ← SQLite-Datenbank (Rezepte, Wochenplan, Einstellungen)
-  minio/
-    mealplaner/        ← Rezept-Bilder (MinIO)
+  mealplaner/          ← SQLite-Datenbank (mealplaner.db) und Rezept-Bilder (images/)
 ```
 
 **Auf Pi1 ausführen** (setzt auch die nötigen Berechtigungen):
 
 ```bash
 sudo mkdir -p /volume1/cloudstorage/docker-swarm-data/mealplaner
-sudo mkdir -p /volume1/cloudstorage/docker-swarm-data/minio/mealplaner
 sudo chmod 777 /volume1/cloudstorage/docker-swarm-data/mealplaner
-sudo chmod 777 /volume1/cloudstorage/docker-swarm-data/minio/mealplaner
 ```
 
 > **Hinweis:** Synology `root_squash` mappt Container-Root auf `nobody`. Deshalb müssen Berechtigungen vom Pi aus per `sudo` gesetzt werden — Container selbst können das nicht.
@@ -76,19 +72,10 @@ und aktualisiert den Service von selbst — manuelles Bauen oder Deployen ist ni
 ### Einmalige Einrichtung auf Pi1
 
 1. NFS-Share und NAS-Verzeichnisse wie oben beschrieben anlegen.
-2. Secrets-Datei anlegen (liegt nur auf dem Pi, nie im Repo):
-
-```bash
-mkdir -p ~/secrets && chmod 700 ~/secrets
-printf 'MINIO_ACCESS_KEY=mealplaner\nMINIO_SECRET_KEY=<starkes-passwort>\n' > ~/secrets/mealplaner.env
-chmod 600 ~/secrets/mealplaner.env
-```
-
-3. Stack deployen:
+2. Stack deployen (keine Secrets nötig):
 
 ```bash
 cd ~/mealplaner && git pull
-set -a; . ~/secrets/mealplaner.env; set +a
 docker stack deploy --with-registry-auth -c docker-compose.yml mealplaner
 ```
 
@@ -115,7 +102,7 @@ Im Dev-Modus:
 | Komponente | Dev-Verhalten |
 |------------|---------------|
 | **SQLite** | `data/dev.db` im Projektverzeichnis |
-| **Bilder** | Lokal in `data/images/` (kein MinIO nötig) |
+| **Bilder** | Lokal in `data/images/` |
 | **Ollama** | `http://localhost:11434` |
 
 ---
@@ -125,11 +112,7 @@ Im Dev-Modus:
 ```bash
 docker stack ps mealplaner               # Service-Status
 docker service logs mealplaner_app       # App-Logs
-docker service logs mealplaner_minio     # MinIO-Logs
 ```
-
-MinIO-Konsole (Web-UI): `http://pi1:9003`  
-Benutzername und Passwort stehen in `~/secrets/mealplaner.env` auf dem Pi.
 
 ---
 
@@ -142,8 +125,7 @@ sudo rm -rf /volume1/cloudstorage/docker-swarm-data/mealplaner/*
 docker service scale mealplaner_app=1
 
 # Alle Bilder löschen
-sudo rm -rf /volume1/cloudstorage/docker-swarm-data/minio/mealplaner/*
-docker service update --force mealplaner_minio
+sudo rm -rf /volume1/cloudstorage/docker-swarm-data/mealplaner/images
 ```
 
 ---
@@ -170,18 +152,18 @@ Modelle werden beim App-Start automatisch heruntergeladen, falls noch nicht vorh
 
 ## Recovery
 
-Da SQLite und MinIO-Daten auf der NAS liegen, gehen bei einem Pi-Ausfall keine Daten verloren:
+Da SQLite und Bilder auf der NAS liegen, gehen bei einem Pi-Ausfall keine Daten verloren:
 
 ```bash
 git clone git@github.com:Urr4/mealplaner.git ~/mealplaner
-# Secrets-Datei ~/secrets/mealplaner.env neu anlegen, dann Stack deployen (siehe „Deployment")
+# Stack deployen (siehe „Deployment")
 ```
 
 ---
 
 ## Docker Swarm — Hinweise
 
-- **Netzwerk `internal`**: Internes Stack-Netzwerk, nur für die Kommunikation zwischen App und MinIO
-- **Ports**: App auf 3001, MinIO nutzt 9002 (API) und 9003 (Konsole). Kein Konflikt mit taster (nutzt 80, 443, 3000)
+- **Netzwerk `internal`**: Internes Stack-Netzwerk, für die Stack-Services
+- **Ports**: App auf 3001. Kein Konflikt mit taster (nutzt 80, 443, 3000)
 - **SQLite auf NFS**: `noac`-Option verhindert inkonsistente Lesevorgänge
 

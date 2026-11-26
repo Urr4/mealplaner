@@ -18,7 +18,7 @@ async function deleteImage(key) {
 }
 
 async function getImageUrl(key) {
-  return `/dev-images/${key}`;
+  return `/images/${key}`;
 }
 
 module.exports = { uploadImage, deleteImage, getImageUrl, BASE_DIR };
