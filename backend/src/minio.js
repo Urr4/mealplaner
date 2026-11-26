@@ -4,6 +4,12 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const isLocal = () => (process.env.STORAGE_TYPE || 'minio') === 'local';
 const BUCKET = process.env.MINIO_BUCKET || 'mealplaner';
 
+function requireSecretKey() {
+  const key = process.env.MINIO_SECRET_KEY;
+  if (!key) throw new Error('MINIO_SECRET_KEY ist nicht gesetzt');
+  return key;
+}
+
 // Internal client — used for API operations (upload, delete, bucket creation)
 function getClient() {
   return new S3Client({
@@ -11,7 +17,7 @@ function getClient() {
     region: 'us-east-1',
     credentials: {
       accessKeyId: process.env.MINIO_ACCESS_KEY || 'mealplaner',
-      secretAccessKey: process.env.MINIO_SECRET_KEY || '***REMOVED***',
+      secretAccessKey: requireSecretKey(),
     },
     forcePathStyle: true,
   });
@@ -25,7 +31,7 @@ function getPublicClient() {
     region: 'us-east-1',
     credentials: {
       accessKeyId: process.env.MINIO_ACCESS_KEY || 'mealplaner',
-      secretAccessKey: process.env.MINIO_SECRET_KEY || '***REMOVED***',
+      secretAccessKey: requireSecretKey(),
     },
     forcePathStyle: true,
   });

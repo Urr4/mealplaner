@@ -10,8 +10,8 @@ NEO4J_CONTAINER="mealplaner-neo4j"
 MINIO_CONTAINER="mealplaner-minio"
 MINIO_BUCKET="recipes"
 MINIO_USER="mealplaner"
-MINIO_PASS="***REMOVED***"
-NEO4J_PASS="mealplaner"
+MINIO_PASS="${MINIO_SECRET_KEY:?MINIO_SECRET_KEY setzen, z. B. export MINIO_SECRET_KEY=dev-passwort}"
+NEO4J_PASS="${NEO4J_PASSWORD:?NEO4J_PASSWORD setzen, z. B. export NEO4J_PASSWORD=dev-passwort}"
 
 # ── Docker network ────────────────────────────────────────────────────────────
 if ! docker network ls --format '{{.Name}}' | grep -q "^${NETWORK}$"; then

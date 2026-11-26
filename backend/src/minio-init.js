@@ -14,12 +14,16 @@ async function ensureBucket() {
     return;
   }
 
+  if (!process.env.MINIO_SECRET_KEY) {
+    throw new Error('MINIO_SECRET_KEY ist nicht gesetzt');
+  }
+
   const client = new S3Client({
     endpoint: process.env.MINIO_ENDPOINT || 'http://localhost:9000',
     region: 'us-east-1',
     credentials: {
       accessKeyId: process.env.MINIO_ACCESS_KEY || 'mealplaner',
-      secretAccessKey: process.env.MINIO_SECRET_KEY || '***REMOVED***',
+      secretAccessKey: process.env.MINIO_SECRET_KEY,
     },
     forcePathStyle: true,
   });

@@ -67,35 +67,37 @@ sudo chmod 777 /volume1/cloudstorage/docker-swarm-data/minio/mealplaner
 
 ---
 
-## Schnellstart (frische Installation)
+## Deployment (automatisch)
+
+Jeder Push auf `main` baut per GitHub Actions ein ARM64-Image und legt es als
+`ghcr.io/urr4/mealplaner:latest` ab. **Shepherd** auf dem Pi erkennt das neue Image
+und aktualisiert den Service von selbst — manuelles Bauen oder Deployen ist nicht nötig.
+
+### Einmalige Einrichtung auf Pi1
+
+1. NFS-Share und NAS-Verzeichnisse wie oben beschrieben anlegen.
+2. Secrets-Datei anlegen (liegt nur auf dem Pi, nie im Repo):
 
 ```bash
-git clone <repo-url> ~/mealplaner
-cd ~/mealplaner
-chmod +x setup.sh
-./setup.sh
+mkdir -p ~/secrets && chmod 700 ~/secrets
+printf 'MINIO_ACCESS_KEY=mealplaner\nMINIO_SECRET_KEY=<starkes-passwort>\n' > ~/secrets/mealplaner.env
+chmod 600 ~/secrets/mealplaner.env
 ```
 
-Das Skript erledigt automatisch:
-1. Docker und NFS-Tools installieren
-2. NFS-Share mounten und in `/etc/fstab` eintragen
-3. NAS-Verzeichnisse anlegen und Berechtigungen setzen
-4. Docker-Image bauen (ARM64 für Raspberry Pi)
-5. Stack deployen
-
-**Erreichbar unter: `http://pi1:3001`**
-
----
-
-## Nach Code-Änderungen neu deployen
+3. Stack deployen:
 
 ```bash
-cd ~/mealplaner
-git pull
-./redeploy.sh
+cd ~/mealplaner && git pull
+set -a; . ~/secrets/mealplaner.env; set +a
+docker stack deploy --with-registry-auth -c docker-compose.yml mealplaner
 ```
 
-`redeploy.sh` baut das Image neu und deployt den Stack idempotent (funktioniert auch beim ersten Mal).
+Dieser Schritt ist nur beim ersten Mal und nach Änderungen an `docker-compose.yml` nötig.
+Den Shepherd-Stack gibt es im Repo `taster` (Ordner `shepherd/`).
+
+Rollback auf eine ältere Version:
+`docker service update --image ghcr.io/urr4/mealplaner:sha-<commit> mealplaner_app`
+(danach das Label/Tag wieder auf `latest` stellen oder Shepherd kurz pausieren).
 
 ---
 
@@ -127,15 +129,21 @@ docker service logs mealplaner_minio     # MinIO-Logs
 ```
 
 MinIO-Konsole (Web-UI): `http://pi1:9003`  
-Benutzername: `mealplaner` / Passwort: `***REMOVED***`
+Benutzername und Passwort stehen in `~/secrets/mealplaner.env` auf dem Pi.
 
 ---
 
 ## Daten zurücksetzen
 
 ```bash
-./setup.sh --wipe-db       # Datenbank löschen (alle Rezepte, Wochenplan, Einstellungen)
-./setup.sh --wipe-minio    # Alle Bilder löschen
+# Datenbank löschen (alle Rezepte, Wochenplan, Einstellungen)
+docker service scale mealplaner_app=0
+sudo rm -rf /volume1/cloudstorage/docker-swarm-data/mealplaner/*
+docker service scale mealplaner_app=1
+
+# Alle Bilder löschen
+sudo rm -rf /volume1/cloudstorage/docker-swarm-data/minio/mealplaner/*
+docker service update --force mealplaner_minio
 ```
 
 ---
@@ -165,9 +173,8 @@ Modelle werden beim App-Start automatisch heruntergeladen, falls noch nicht vorh
 Da SQLite und MinIO-Daten auf der NAS liegen, gehen bei einem Pi-Ausfall keine Daten verloren:
 
 ```bash
-git clone <repo-url> ~/mealplaner
-cd ~/mealplaner
-./setup.sh   # Daten bereits auf der NAS vorhanden — kein Verlust
+git clone git@github.com:Urr4/mealplaner.git ~/mealplaner
+# Secrets-Datei ~/secrets/mealplaner.env neu anlegen, dann Stack deployen (siehe „Deployment")
 ```
 
 ---

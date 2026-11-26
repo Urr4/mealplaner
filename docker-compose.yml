@@ -14,9 +14,15 @@ version: "3.9"
 #       sudo chmod 777 /volume1/cloudstorage/docker-swarm-data/mealplaner
 #       sudo chmod 777 /volume1/cloudstorage/docker-swarm-data/minio/mealplaner
 #
-#  3. Deployen:
-#       docker build --platform linux/arm64 -t mealplaner:latest .
-#       docker stack deploy -c docker-compose.yml mealplaner
+#  3. Secrets-Datei anlegen (einmalig, nur auf dem Pi, nicht im Repo):
+#       mkdir -p ~/secrets && chmod 700 ~/secrets
+#       printf 'MINIO_ACCESS_KEY=mealplaner\nMINIO_SECRET_KEY=<starkes-passwort>\n' > ~/secrets/mealplaner.env
+#       chmod 600 ~/secrets/mealplaner.env
+#
+#  4. Stack deployen (nur beim ersten Mal und bei Änderungen an dieser Datei;
+#     neue App-Versionen rollt Shepherd automatisch aus):
+#       set -a; . ~/secrets/mealplaner.env; set +a
+#       docker stack deploy --with-registry-auth -c docker-compose.yml mealplaner
 #
 #  Erreichbar unter: http://pi1:3001
 # ─────────────────────────────────────────────────────────────────────────────
@@ -25,7 +31,7 @@ services:
 
   # ── App ──────────────────────────────────────────────────────────────────────
   app:
-    image: mealplaner:latest
+    image: ghcr.io/urr4/mealplaner:latest
     environment:
       PORT: "3001"
       DB_PATH: /data/mealplaner.db
@@ -33,7 +39,7 @@ services:
       MINIO_PUBLIC_URL: http://pi1:9002
       MINIO_BUCKET: mealplaner
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-mealplaner}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-***REMOVED***}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY fehlt (siehe ~/secrets/mealplaner.env)}
       OLLAMA_URL: ${OLLAMA_URL:-http://Stefans-PC:11434}
       OLLAMA_VISION_MODEL: ${OLLAMA_VISION_MODEL:-qwen2.5vl:7b}
       OLLAMA_TEXT_MODEL: ${OLLAMA_TEXT_MODEL:-llama3.2:3b}
@@ -55,6 +61,8 @@ services:
       start_period: 40s
     deploy:
       replicas: 1
+      labels:
+        - shepherd.autoupdate=true
       restart_policy:
         condition: any
         delay: 10s
@@ -70,7 +78,7 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-mealplaner}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-***REMOVED***}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY fehlt (siehe ~/secrets/mealplaner.env)}
     volumes:
       - minio-data:/data
     networks:
