@@ -80,7 +80,7 @@ docker stack deploy --with-registry-auth -c docker-compose.yml mealplaner
 ```
 
 Dieser Schritt ist nur beim ersten Mal und nach Änderungen an `docker-compose.yml` nötig.
-Den Shepherd-Stack gibt es im Repo `taster` (Ordner `shepherd/`).
+Den Shepherd-Stack und das Wiederherstellungs-Skript gibt es im Repo `shepherd-bootstrap`.
 
 Rollback auf eine ältere Version:
 `docker service update --image ghcr.io/urr4/mealplaner:sha-<commit> mealplaner_app`
